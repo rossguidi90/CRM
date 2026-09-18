@@ -2,940 +2,630 @@
 <html lang="it">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1">
-<title>CRM Wine Alchemist</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CRM Vendita — Wine Alchemist</title>
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 <style>
 :root{
-  --bg:#f5f5f7; --card:#ffffff; --text:#1d1d1f; --muted:#6e6e73;
-  --accent:#0071e3; --accent-dark:#005bb5; --danger:#ff3b30; --success:#34c759; --warn:#ff9f0a;
-  --border:#e5e5ea; --radius:14px; --shadow:0 1px 3px rgba(0,0,0,.08),0 1px 2px rgba(0,0,0,.06);
+  --bg:#f5f5f7; --card:#ffffff; --text:#1d1d1f; --sub:#6e6e73;
+  --accent:#7b2d26; --accent-light:#a94438; --border:#e5e5ea;
+  --danger:#d9453d; --success:#2fa84f; --radius:14px;
+  --shadow:0 1px 3px rgba(0,0,0,.06), 0 4px 14px rgba(0,0,0,.04);
 }
-*{box-sizing:border-box;}
-html,body{margin:0;padding:0;height:100%;}
-body{
-  background:var(--bg); color:var(--text);
-  font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI",Roboto,Helvetica,Arial,sans-serif;
-  -webkit-font-smoothing:antialiased;
-}
-a{color:inherit;text-decoration:none;}
-button{font-family:inherit;}
-input,select,textarea{font-family:inherit;font-size:15px;}
+*{box-sizing:border-box}
+body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI",Roboto,sans-serif;background:var(--bg);color:var(--text);-webkit-font-smoothing:antialiased}
+button{font-family:inherit;cursor:pointer;border:none;border-radius:10px;padding:10px 16px;font-size:14px;font-weight:600;transition:.15s}
+input,select,textarea{font-family:inherit;border:1px solid var(--border);border-radius:10px;padding:10px 12px;font-size:14px;background:#fff;width:100%;color:var(--text)}
+input:focus,select:focus,textarea:focus{outline:2px solid var(--accent-light);outline-offset:1px}
+.btn-primary{background:var(--accent);color:#fff}
+.btn-primary:hover{background:var(--accent-light)}
+.btn-secondary{background:#eceef0;color:var(--text)}
+.btn-secondary:hover{background:#e0e2e5}
+.btn-danger{background:#fdeceb;color:var(--danger)}
+.hidden{display:none !important}
 
-/* ---------- Layout ---------- */
-#app{min-height:100vh;display:flex;flex-direction:column;}
-.topbar{
-  position:sticky;top:0;z-index:50;background:rgba(255,255,255,.85);backdrop-filter:blur(20px);
-  border-bottom:1px solid var(--border); display:flex;align-items:center;justify-content:space-between;
-  padding:12px 20px;
-}
-.topbar .brand{font-weight:700;font-size:17px;display:flex;align-items:center;gap:8px;}
-.topbar .brand .dot{width:9px;height:9px;border-radius:50%;background:var(--accent);}
-.topbar .user{display:flex;align-items:center;gap:12px;font-size:14px;color:var(--muted);}
-.topbar .user button{
-  background:none;border:1px solid var(--border);border-radius:20px;padding:6px 14px;color:var(--text);cursor:pointer;
-}
-.topbar .user button:hover{background:var(--bg);}
+/* LOGIN */
+#login-view{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px}
+.login-box{background:var(--card);padding:40px 32px;border-radius:var(--radius);box-shadow:var(--shadow);width:100%;max-width:360px}
+.login-box h1{font-size:22px;margin:0 0 4px;text-align:center}
+.login-box p.sub{color:var(--sub);text-align:center;margin:0 0 24px;font-size:14px}
+.login-box label{font-size:13px;font-weight:600;color:var(--sub);display:block;margin:14px 0 6px}
+.login-box button{width:100%;margin-top:20px;padding:12px}
+.err{color:var(--danger);font-size:13px;margin-top:10px;text-align:center}
+.toggle-link{text-align:center;margin-top:16px;font-size:13px;color:var(--accent);cursor:pointer}
 
-.shell{display:flex;flex:1;width:100%;max-width:1200px;margin:0 auto;}
-.sidebar{
-  width:220px;flex-shrink:0;padding:20px 12px;display:flex;flex-direction:column;gap:2px;
-}
-.sidebar a{
-  display:flex;align-items:center;gap:10px;padding:10px 14px;border-radius:10px;color:var(--muted);
-  font-size:14.5px;font-weight:500;
-}
-.sidebar a.active{background:var(--accent);color:#fff;}
-.sidebar a:not(.active):hover{background:#eceef0;}
-main{flex:1;padding:24px 24px 90px;min-width:0;}
-
-.tabbar{
-  display:none;position:fixed;bottom:0;left:0;right:0;background:rgba(255,255,255,.92);backdrop-filter:blur(20px);
-  border-top:1px solid var(--border);justify-content:space-around;padding:6px 0 max(6px,env(safe-area-inset-bottom));z-index:50;
-}
-.tabbar a{display:flex;flex-direction:column;align-items:center;gap:2px;color:var(--muted);font-size:10.5px;padding:4px 8px;}
-.tabbar a.active{color:var(--accent);}
-.tabbar .ic{font-size:20px;line-height:1;}
-
-@media (max-width:860px){
-  .sidebar{display:none;}
-  .tabbar{display:flex;}
-  main{padding:16px 14px 90px;}
-}
-
-/* ---------- Components ---------- */
-.card{background:var(--card);border-radius:var(--radius);box-shadow:var(--shadow);padding:20px;margin-bottom:16px;}
-.card h3{margin:0 0 14px;font-size:16px;}
-.grid{display:grid;gap:16px;}
-.grid.cols-2{grid-template-columns:1fr 1fr;}
-.grid.cols-3{grid-template-columns:repeat(3,1fr);}
-.grid.cols-4{grid-template-columns:repeat(4,1fr);}
-@media (max-width:700px){.grid.cols-2,.grid.cols-3,.grid.cols-4{grid-template-columns:1fr 1fr;}}
-
-.stat{background:var(--card);border-radius:var(--radius);box-shadow:var(--shadow);padding:18px;}
-.stat .num{font-size:26px;font-weight:700;}
-.stat .label{color:var(--muted);font-size:12.5px;margin-top:2px;}
-
-h1.page-title{font-size:24px;margin:0 0 18px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;}
-h1.page-title small{font-size:13px;color:var(--muted);font-weight:400;}
-
-.btn{
-  display:inline-flex;align-items:center;justify-content:center;gap:6px;background:var(--accent);color:#fff;border:none;
-  border-radius:10px;padding:10px 18px;font-size:14.5px;font-weight:600;cursor:pointer;transition:background .15s;
-}
-.btn:hover{background:var(--accent-dark);}
-.btn.secondary{background:var(--bg);color:var(--text);border:1px solid var(--border);}
-.btn.secondary:hover{background:#e9e9eb;}
-.btn.danger{background:var(--danger);}
-.btn.small{padding:6px 12px;font-size:13px;border-radius:8px;}
-.btn:disabled{opacity:.5;cursor:not-allowed;}
-
-.field{margin-bottom:14px;}
-.field label{display:block;font-size:12.5px;color:var(--muted);margin-bottom:5px;font-weight:500;}
-.field input,.field select,.field textarea{
-  width:100%;padding:10px 12px;border:1px solid var(--border);border-radius:10px;background:#fff;color:var(--text);
-}
-.field input:focus,.field select:focus,.field textarea:focus{outline:2px solid var(--accent);outline-offset:-1px;}
-.field textarea{resize:vertical;min-height:70px;}
-
-table{width:100%;border-collapse:collapse;font-size:14px;}
-th{text-align:left;color:var(--muted);font-weight:600;font-size:12px;text-transform:uppercase;letter-spacing:.03em;padding:8px 10px;border-bottom:1px solid var(--border);}
-td{padding:10px;border-bottom:1px solid #f0f0f2;}
-tr:last-child td{border-bottom:none;}
-tr.clickable{cursor:pointer;}
-tr.clickable:hover{background:#f8f8fa;}
-
-.badge{display:inline-block;padding:3px 10px;border-radius:20px;font-size:11.5px;font-weight:600;}
-.badge.bozza{background:#fff2e0;color:#b26a00;}
-.badge.confermato{background:#e3f8e9;color:#1c7c3c;}
-.badge.annullato{background:#fdeaea;color:#c62828;}
-.badge.attivo{background:#e3f8e9;color:#1c7c3c;}
-.badge.sospeso{background:#f0f0f2;color:#6e6e73;}
-
-.searchbar{display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap;}
-.searchbar input,.searchbar select{padding:10px 12px;border:1px solid var(--border);border-radius:10px;flex:1;min-width:140px;}
-
-.empty{text-align:center;padding:50px 20px;color:var(--muted);}
-.empty .ic{font-size:36px;margin-bottom:8px;}
-
-.toast-wrap{position:fixed;top:16px;right:16px;z-index:200;display:flex;flex-direction:column;gap:8px;}
-.toast{background:#1d1d1f;color:#fff;padding:12px 18px;border-radius:10px;font-size:13.5px;box-shadow:var(--shadow);animation:fade .2s;max-width:320px;}
-.toast.err{background:var(--danger);}
-.toast.ok{background:#1c7c3c;}
-@keyframes fade{from{opacity:0;transform:translateY(-6px);}to{opacity:1;transform:translateY(0);}}
-
-.map-box{height:260px;border-radius:12px;overflow:hidden;border:1px solid var(--border);}
-#login-screen{min-height:100vh;display:flex;align-items:center;justify-content:center;background:linear-gradient(160deg,#f5f5f7,#e9edf3);padding:20px;}
-.login-card{background:#fff;border-radius:20px;box-shadow:0 10px 40px rgba(0,0,0,.12);padding:36px;width:100%;max-width:380px;}
-.login-card h1{font-size:22px;margin:0 0 4px;text-align:center;}
-.login-card p.sub{text-align:center;color:var(--muted);font-size:13.5px;margin:0 0 26px;}
-.login-tabs{display:flex;background:var(--bg);border-radius:10px;padding:3px;margin-bottom:20px;}
-.login-tabs button{flex:1;padding:8px;border:none;background:none;border-radius:8px;font-size:13.5px;font-weight:600;color:var(--muted);cursor:pointer;}
-.login-tabs button.active{background:#fff;color:var(--text);box-shadow:0 1px 3px rgba(0,0,0,.15);}
-.hidden{display:none !important;}
-.spinner{width:16px;height:16px;border:2px solid rgba(255,255,255,.4);border-top-color:#fff;border-radius:50%;animation:spin .7s linear infinite;display:inline-block;}
-@keyframes spin{to{transform:rotate(360deg);}}
-.link-btn{background:none;border:none;color:var(--accent);cursor:pointer;font-size:13px;padding:0;}
-.row-items{display:flex;gap:8px;align-items:center;padding:8px 0;border-bottom:1px solid #f0f0f2;}
-.row-items:last-child{border-bottom:none;}
-.muted{color:var(--muted);}
-.kpi-row{display:flex;gap:16px;flex-wrap:wrap;margin-bottom:20px;}
-.kpi-row .stat{flex:1;min-width:130px;}
-.section-tabs{display:flex;gap:4px;margin-bottom:18px;border-bottom:1px solid var(--border);}
-.section-tabs button{background:none;border:none;padding:10px 4px;margin-right:18px;font-size:14px;color:var(--muted);cursor:pointer;border-bottom:2px solid transparent;font-weight:500;}
-.section-tabs button.active{color:var(--accent);border-bottom-color:var(--accent);}
+/* APP SHELL */
+#app-view{display:none;min-height:100vh}
+header.topbar{background:var(--card);border-bottom:1px solid var(--border);padding:14px 24px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:50}
+header.topbar .brand{font-weight:700;font-size:17px}
+header.topbar .brand span{color:var(--accent)}
+.user-chip{display:flex;align-items:center;gap:10px;font-size:13px;color:var(--sub)}
+nav.tabs{display:flex;gap:4px;background:var(--card);padding:6px;margin:16px 24px 0;border-radius:12px;box-shadow:var(--shadow);width:fit-content;overflow-x:auto}
+nav.tabs button{background:transparent;color:var(--sub);padding:8px 16px;border-radius:8px;font-size:14px}
+nav.tabs button.active{background:var(--accent);color:#fff}
+main{padding:20px 24px 60px;max-width:1200px;margin:0 auto}
+.view{display:none}
+.view.active{display:block}
+.card{background:var(--card);border-radius:var(--radius);box-shadow:var(--shadow);padding:20px}
+.section-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:10px}
+.section-head h2{margin:0;font-size:20px}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:14px}
+.list-item{background:var(--card);border-radius:var(--radius);box-shadow:var(--shadow);padding:16px;cursor:pointer;transition:.15s}
+.list-item:hover{transform:translateY(-2px);box-shadow:0 4px 20px rgba(0,0,0,.08)}
+.list-item h3{margin:0 0 4px;font-size:16px}
+.list-item .meta{color:var(--sub);font-size:13px;margin:2px 0}
+.badge{display:inline-block;font-size:11px;font-weight:700;padding:3px 8px;border-radius:6px;text-transform:uppercase;letter-spacing:.3px}
+.badge.attivo{background:#e6f7ea;color:var(--success)}
+.badge.prospect{background:#fff4e0;color:#b8790a}
+.badge.inattivo{background:#f0f0f2;color:var(--sub)}
+.search-bar{display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap}
+.search-bar input{flex:1;min-width:200px}
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.4);display:flex;align-items:center;justify-content:center;z-index:100;padding:20px}
+.modal{background:var(--card);border-radius:var(--radius);max-width:560px;width:100%;max-height:88vh;overflow-y:auto;padding:24px}
+.modal h2{margin-top:0}
+.form-row{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px}
+.form-row.full{grid-template-columns:1fr}
+.modal-actions{display:flex;justify-content:flex-end;gap:10px;margin-top:20px}
+#map{height:200px;border-radius:10px;margin-top:10px;background:#eee}
+.tag-title{font-size:12px;font-weight:700;color:var(--sub);text-transform:uppercase;letter-spacing:.4px;margin:18px 0 8px}
+.tag-title:first-child{margin-top:0}
+.wine-pick{display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--border)}
+.wine-pick:last-child{border-bottom:none}
+.wine-pick .qty{width:70px}
+.order-line{display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border);font-size:14px}
+.total-row{display:flex;justify-content:space-between;font-weight:700;font-size:16px;padding-top:10px}
+.empty-state{text-align:center;color:var(--sub);padding:40px 20px}
+.stat-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:14px;margin-bottom:20px}
+.stat-card{background:var(--card);border-radius:var(--radius);box-shadow:var(--shadow);padding:18px}
+.stat-card .num{font-size:26px;font-weight:700}
+.stat-card .lbl{color:var(--sub);font-size:13px;margin-top:2px}
+table{width:100%;border-collapse:collapse;font-size:14px}
+th,td{text-align:left;padding:10px 8px;border-bottom:1px solid var(--border)}
+th{color:var(--sub);font-weight:600;font-size:12px;text-transform:uppercase}
+.spinner{width:18px;height:18px;border:2px solid #ddd;border-top-color:var(--accent);border-radius:50%;animation:spin .7s linear infinite;display:inline-block}
+@keyframes spin{to{transform:rotate(360deg)}}
+.toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:#1d1d1f;color:#fff;padding:12px 20px;border-radius:10px;font-size:14px;z-index:200;box-shadow:var(--shadow)}
+@media(max-width:600px){.form-row{grid-template-columns:1fr}main{padding:14px}header.topbar{padding:12px 16px}nav.tabs{margin:12px 16px 0}}
 </style>
 </head>
 <body>
-<div id="login-screen" class="hidden">
-  <div class="login-card">
-    <h1>🍷 Wine Alchemist</h1>
-    <p class="sub">CRM vendita — accesso agenti</p>
-    <div class="login-tabs">
-      <button id="tab-login" class="active">Accedi</button>
-      <button id="tab-signup">Registrati</button>
-    </div>
-    <div id="login-form">
-      <div class="field"><label>Email</label><input type="email" id="li-email" autocomplete="username"></div>
-      <div class="field"><label>Password</label><input type="password" id="li-pass" autocomplete="current-password"></div>
-      <button class="btn" id="btn-login" style="width:100%;">Accedi</button>
-      <div style="text-align:center;margin-top:14px;"><button class="link-btn" id="btn-forgot">Password dimenticata?</button></div>
-    </div>
-    <div id="signup-form" class="hidden">
-      <div class="field"><label>Nome e cognome</label><input type="text" id="su-nome"></div>
-      <div class="field"><label>Email</label><input type="email" id="su-email"></div>
-      <div class="field"><label>Password</label><input type="password" id="su-pass"></div>
-      <button class="btn" id="btn-signup" style="width:100%;">Crea account</button>
-    </div>
-    <div id="reset-form" class="hidden">
-      <div class="field"><label>Email</label><input type="email" id="rs-email"></div>
-      <button class="btn" id="btn-reset" style="width:100%;">Invia link di reset</button>
-      <div style="text-align:center;margin-top:14px;"><button class="link-btn" id="btn-back-login">Torna al login</button></div>
-    </div>
-    <div id="login-msg" style="margin-top:14px;font-size:13px;text-align:center;"></div>
+
+<!-- LOGIN -->
+<div id="login-view">
+  <div class="login-box">
+    <h1>🍷 CRM Vendita</h1>
+    <p class="sub">Wine Alchemist — rete agenti Milano</p>
+    <form id="login-form">
+      <label>Email</label>
+      <input type="email" id="login-email" required autocomplete="username">
+      <label>Password</label>
+      <input type="password" id="login-password" required autocomplete="current-password">
+      <button type="submit" class="btn-primary" id="login-btn">Accedi</button>
+      <div class="err hidden" id="login-err"></div>
+    </form>
+    <div class="toggle-link" id="toggle-signup">Non hai un account? Registrati</div>
   </div>
 </div>
 
-<div id="app" class="hidden">
-  <div class="topbar">
-    <div class="brand"><span class="dot"></span> Wine Alchemist CRM</div>
-    <div class="user">
-      <span id="user-name"></span>
-      <button id="btn-logout">Esci</button>
+<!-- APP -->
+<div id="app-view">
+  <header class="topbar">
+    <div class="brand">🍷 CRM <span>Wine Alchemist</span></div>
+    <div class="user-chip">
+      <span id="agente-nome"></span>
+      <button class="btn-secondary" id="logout-btn">Esci</button>
     </div>
-  </div>
-  <div class="shell">
-    <nav class="sidebar" id="sidebar"></nav>
-    <main id="main"></main>
-  </div>
-  <nav class="tabbar" id="tabbar"></nav>
+  </header>
+
+  <nav class="tabs">
+    <button data-view="clienti" class="active">Clienti</button>
+    <button data-view="catalogo">Catalogo</button>
+    <button data-view="ordini">Ordini</button>
+    <button data-view="analisi">Analisi</button>
+  </nav>
+
+  <main>
+    <!-- CLIENTI -->
+    <div class="view active" id="view-clienti">
+      <div class="section-head">
+        <h2>Clienti</h2>
+        <button class="btn-primary" id="new-cliente-btn">+ Nuovo cliente</button>
+      </div>
+      <div class="search-bar">
+        <input type="text" id="cliente-search" placeholder="Cerca per nome, città, agente...">
+        <select id="cliente-filter-stato">
+          <option value="">Tutti gli stati</option>
+          <option value="attivo">Attivo</option>
+          <option value="prospect">Prospect</option>
+          <option value="inattivo">Inattivo</option>
+        </select>
+      </div>
+      <div class="grid" id="clienti-list"></div>
+    </div>
+
+    <!-- CATALOGO -->
+    <div class="view" id="view-catalogo">
+      <div class="section-head">
+        <h2>Catalogo vini</h2>
+        <button class="btn-primary" id="new-vino-btn">+ Nuova referenza</button>
+      </div>
+      <div class="search-bar">
+        <input type="text" id="vino-search" placeholder="Cerca per nome, produttore, tipologia...">
+      </div>
+      <div class="grid" id="vini-list"></div>
+    </div>
+
+    <!-- ORDINI -->
+    <div class="view" id="view-ordini">
+      <div class="section-head">
+        <h2>Ordini</h2>
+        <button class="btn-primary" id="new-ordine-btn">+ Nuovo ordine</button>
+      </div>
+      <div class="search-bar">
+        <select id="ordine-filter-stato">
+          <option value="">Tutti gli stati</option>
+          <option value="bozza">Bozza</option>
+          <option value="confermato">Confermato</option>
+          <option value="evaso">Evaso</option>
+          <option value="annullato">Annullato</option>
+        </select>
+      </div>
+      <div id="ordini-list"></div>
+    </div>
+
+    <!-- ANALISI -->
+    <div class="view" id="view-analisi">
+      <div class="section-head"><h2>Analisi vendite</h2></div>
+      <div class="stat-grid" id="analisi-stats"></div>
+      <div class="card" style="margin-bottom:14px">
+        <h3 style="margin-top:0">📦 Da riordinare (scorta bassa, storicamente venduti)</h3>
+        <table id="tbl-riordinare"><thead><tr><th>Vino</th><th>Produttore</th><th>Disponibili</th><th>Venduti</th></tr></thead><tbody></tbody></table>
+      </div>
+      <div class="card">
+        <h3 style="margin-top:0">🔁 Da riproporre (venduti bene, fermi da 60+ giorni)</h3>
+        <table id="tbl-riproporre"><thead><tr><th>Vino</th><th>Produttore</th><th>Unità vendute</th><th>Ultima vendita</th></tr></thead><tbody></tbody></table>
+      </div>
+    </div>
+  </main>
 </div>
 
-<div class="toast-wrap" id="toasts"></div>
+<div id="modal-root"></div>
 
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 <script>
-/* ===================== CONFIG ===================== */
-const SUPABASE_URL = 'https://xnzqutbfmaofvsurmkxf.supabase.co';
-const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhuenF1dGJmbWFvZnZzdXJta3hmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODk3MjcxNzUsImV4cCI6MjEwNTMwMzE3NX0.mUJ5g-6QNLTnk5hCfHPjwTN45unJauaZOg2Pg_AIkkA';
-const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY, { auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true } });
+/* ================= CONFIG ================= */
+const SUPABASE_URL = "https://xnzqutbfmaofvsurmkxf.supabase.co";
+const SUPABASE_KEY = "sb_publishable_8G0qe9wScbs1JjIhJ9Y3bA_8XN1LZ5o";
+const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-const NAV = [
-  { path:'dashboard', label:'Dashboard', ic:'🏠' },
-  { path:'clienti', label:'Clienti', ic:'🏛️' },
-  { path:'catalogo', label:'Catalogo', ic:'🍾' },
-  { path:'ordini', label:'Ordini', ic:'📋' },
-  { path:'analisi', label:'Analisi', ic:'📈' },
-];
+let state = { user:null, agente:null, isSignup:false, clienti:[], vini:[], ordini:[], currentOrderLines:[] };
 
-let state = { user:null, agente:null, agentiById:{}, clienti:[], vini:[] };
-
-/* ===================== UTIL ===================== */
-function toast(msg, type=''){
-  const el = document.createElement('div');
-  el.className = 'toast' + (type ? ' '+type : '');
-  el.textContent = msg;
-  document.getElementById('toasts').appendChild(el);
-  setTimeout(()=>el.remove(), 4200);
+/* ================= UTIL ================= */
+function toast(msg){
+  const t=document.createElement('div'); t.className='toast'; t.textContent=msg;
+  document.body.appendChild(t); setTimeout(()=>t.remove(),2800);
 }
-function euro(n){ return (Number(n)||0).toLocaleString('it-IT',{style:'currency',currency:'EUR'}); }
-function fmtDate(d){ if(!d) return '—'; return new Date(d).toLocaleDateString('it-IT',{day:'2-digit',month:'short',year:'numeric'}); }
-function fmtDateTime(d){ if(!d) return '—'; return new Date(d).toLocaleString('it-IT',{day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'}); }
-function esc(s){ return (s==null?'':String(s)).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
-function debounce(fn, ms){ let t; return (...a)=>{ clearTimeout(t); t=setTimeout(()=>fn(...a), ms); }; }
-function qs(sel, root=document){ return root.querySelector(sel); }
-function qsa(sel, root=document){ return [...root.querySelectorAll(sel)]; }
+function fmtMoney(n){ return (n||0).toLocaleString('it-IT',{style:'currency',currency:'EUR'}); }
+function fmtDate(d){ return d ? new Date(d).toLocaleDateString('it-IT') : '—'; }
+function esc(s){ return (s||'').toString().replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function openModal(html){
+  document.getElementById('modal-root').innerHTML = `<div class="modal-overlay" id="modal-overlay"><div class="modal">${html}</div></div>`;
+  document.getElementById('modal-overlay').addEventListener('click', e=>{ if(e.target.id==='modal-overlay') closeModal(); });
+}
+function closeModal(){ document.getElementById('modal-root').innerHTML=''; }
 
-async function geocode(indirizzo){
-  if(!indirizzo || indirizzo.trim().length<4) return null;
+// Descrizione automatica del locale a partire dal nome (euristica locale, nessuna chiamata esterna)
+function descrizioneAuto(nome, tipo){
+  const t = (tipo||'locale').toLowerCase();
+  const n = (nome||'').trim();
+  if(!n) return '';
+  return `${n} — ${t} selezionato per la proposta carta vini, potenziale cliente HoReCa in zona Milano.`;
+}
+
+/* ================= AUTH ================= */
+document.getElementById('toggle-signup').addEventListener('click', ()=>{
+  state.isSignup = !state.isSignup;
+  document.getElementById('login-btn').textContent = state.isSignup ? 'Registrati' : 'Accedi';
+  document.getElementById('toggle-signup').textContent = state.isSignup ? 'Hai già un account? Accedi' : 'Non hai un account? Registrati';
+});
+
+document.getElementById('login-form').addEventListener('submit', async (e)=>{
+  e.preventDefault();
+  const email = document.getElementById('login-email').value.trim();
+  const password = document.getElementById('login-password').value;
+  const errEl = document.getElementById('login-err');
+  errEl.classList.add('hidden');
+  const btn = document.getElementById('login-btn');
+  btn.disabled = true;
   try{
-    const url = `https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${encodeURIComponent(indirizzo)}`;
-    const res = await fetch(url, { headers:{ 'Accept':'application/json' } });
-    const data = await res.json();
-    if(data && data[0]) return { lat: parseFloat(data[0].lat), lng: parseFloat(data[0].lon) };
-  }catch(e){ console.warn('geocode fallito', e); }
-  return null;
-}
-
-function genDescrizioneAuto(nome, tipo){
-  const tipi = { 'ristorante':'un ristorante', 'trattoria':'una trattoria', 'enoteca':'un’enoteca', 'bar':'un wine bar', 'hotel':'una struttura ricettiva', 'pizzeria':'una pizzeria' };
-  const t = tipi[(tipo||'').toLowerCase()] || 'un locale';
-  return `${nome} è ${t} selezionato come potenziale cliente per la proposta di referenze Wine Alchemist. Descrizione generata automaticamente — da rifinire con i dettagli raccolti sul campo.`;
-}
-
-/* ===================== AUTH ===================== */
-async function initAuth(){
-  const { data:{ session } } = await sb.auth.getSession();
-  if(session) await onLogged(session.user);
-  else showLogin();
-
-  sb.auth.onAuthStateChange(async (event, session)=>{
-    if(event === 'PASSWORD_RECOVERY'){
-      showLogin();
-      toast('Imposta la nuova password, poi accedi.', 'ok');
-      showTab('reset');
-      return;
+    let res;
+    if(state.isSignup){
+      res = await sb.auth.signUp({ email, password });
+    } else {
+      res = await sb.auth.signInWithPassword({ email, password });
     }
-    if(event === 'SIGNED_IN' && session){ await onLogged(session.user); }
-    if(event === 'SIGNED_OUT'){ showLogin(); }
+    if(res.error) throw res.error;
+    if(state.isSignup && !res.data.session){
+      toast('Registrazione avviata. Controlla la mail per confermare, poi accedi.');
+      state.isSignup = false;
+      document.getElementById('login-btn').textContent = 'Accedi';
+    }
+  }catch(err){
+    errEl.textContent = err.message || 'Errore di autenticazione';
+    errEl.classList.remove('hidden');
+  }finally{
+    btn.disabled = false;
+  }
+});
+
+document.getElementById('logout-btn').addEventListener('click', async ()=>{
+  await sb.auth.signOut();
+});
+
+sb.auth.onAuthStateChange((event, session)=>{
+  if(session){ boot(session); } else { showLogin(); }
+});
+
+function showLogin(){
+  document.getElementById('login-view').style.display='flex';
+  document.getElementById('app-view').style.display='none';
+}
+
+async function boot(session){
+  state.user = session.user;
+  document.getElementById('login-view').style.display='none';
+  document.getElementById('app-view').style.display='block';
+
+  let { data: agente } = await sb.from('agenti').select('*').eq('id', state.user.id).maybeSingle();
+  if(!agente){
+    // fallback nel caso il trigger non sia ancora passato
+    const { data } = await sb.from('agenti').insert({ id: state.user.id, nome: state.user.email.split('@')[0], email: state.user.email }).select().single();
+    agente = data;
+  }
+  state.agente = agente;
+  document.getElementById('agente-nome').textContent = agente?.nome || state.user.email;
+
+  await Promise.all([loadClienti(), loadVini(), loadOrdini()]);
+  renderClienti(); renderVini(); renderOrdini(); renderAnalisi();
+}
+
+/* ================= TABS ================= */
+document.querySelectorAll('nav.tabs button').forEach(btn=>{
+  btn.addEventListener('click', ()=>{
+    document.querySelectorAll('nav.tabs button').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+    document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
+    document.getElementById('view-'+btn.dataset.view).classList.add('active');
+    if(btn.dataset.view==='analisi') renderAnalisi();
+  });
+});
+
+/* ================= CLIENTI ================= */
+async function loadClienti(){
+  const { data, error } = await sb.from('clienti').select('*, agenti(nome)').order('nome_locale');
+  if(error){ toast('Errore caricamento clienti'); return; }
+  state.clienti = data || [];
+}
+
+function renderClienti(){
+  const q = (document.getElementById('cliente-search').value||'').toLowerCase();
+  const statoF = document.getElementById('cliente-filter-stato').value;
+  const list = state.clienti.filter(c=>{
+    const matchQ = !q || (c.nome_locale||'').toLowerCase().includes(q) || (c.indirizzo||'').toLowerCase().includes(q) || (c.agenti?.nome||'').toLowerCase().includes(q);
+    const matchS = !statoF || c.stato===statoF;
+    return matchQ && matchS;
+  });
+  const el = document.getElementById('clienti-list');
+  if(!list.length){ el.innerHTML = `<div class="empty-state">Nessun cliente trovato.</div>`; return; }
+  el.innerHTML = list.map(c=>`
+    <div class="list-item" onclick="openClienteDetail('${c.id}')">
+      <div style="display:flex;justify-content:space-between;align-items:start">
+        <h3>${esc(c.nome_locale)}</h3>
+        <span class="badge ${c.stato}">${c.stato}</span>
+      </div>
+      <div class="meta">${esc(c.tipo_locale||'—')} · ${esc(c.indirizzo||'indirizzo non impostato')}</div>
+      <div class="meta">Agente: ${esc(c.agenti?.nome || '—')}</div>
+    </div>
+  `).join('');
+}
+document.getElementById('cliente-search').addEventListener('input', renderClienti);
+document.getElementById('cliente-filter-stato').addEventListener('change', renderClienti);
+
+document.getElementById('new-cliente-btn').addEventListener('click', ()=>openClienteForm());
+
+function openClienteForm(cliente){
+  const c = cliente || {};
+  openModal(`
+    <h2>${cliente ? 'Modifica cliente' : 'Nuovo cliente'}</h2>
+    <form id="cliente-form">
+      <div class="form-row full"><div><label>Nome locale *</label><input required id="f-nome" value="${esc(c.nome_locale)}"></div></div>
+      <div class="form-row">
+        <div><label>Tipo locale</label><input id="f-tipo" placeholder="ristorante, enoteca, hotel..." value="${esc(c.tipo_locale)}"></div>
+        <div><label>Stato</label>
+          <select id="f-stato">
+            <option value="prospect" ${c.stato==='prospect'?'selected':''}>Prospect</option>
+            <option value="attivo" ${c.stato==='attivo'||!c.stato?'selected':''}>Attivo</option>
+            <option value="inattivo" ${c.stato==='inattivo'?'selected':''}>Inattivo</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-row full"><div><label>Indirizzo</label><input id="f-indirizzo" placeholder="Via, città" value="${esc(c.indirizzo)}"></div></div>
+      <div class="form-row">
+        <div><label>Telefono</label><input id="f-telefono" value="${esc(c.telefono)}"></div>
+        <div><label>Email</label><input id="f-email" value="${esc(c.email)}"></div>
+      </div>
+      <div class="tag-title">Sommelier</div>
+      <div class="form-row">
+        <div><label>Nome</label><input id="f-somm-nome" value="${esc(c.sommelier_nome)}"></div>
+        <div><label>Contatto</label><input id="f-somm-contatto" value="${esc(c.sommelier_contatto)}"></div>
+      </div>
+      <div class="tag-title">Buyer</div>
+      <div class="form-row">
+        <div><label>Nome</label><input id="f-buyer-nome" value="${esc(c.buyer_nome)}"></div>
+        <div><label>Contatto</label><input id="f-buyer-contatto" value="${esc(c.buyer_contatto)}"></div>
+      </div>
+      <div class="form-row full"><div><label>Note</label><textarea id="f-note" rows="2">${esc(c.note)}</textarea></div></div>
+      <div class="modal-actions">
+        <button type="button" class="btn-secondary" onclick="closeModal()">Annulla</button>
+        <button type="submit" class="btn-primary">Salva</button>
+      </div>
+    </form>
+  `);
+  document.getElementById('cliente-form').addEventListener('submit', async (e)=>{
+    e.preventDefault();
+    const nome = document.getElementById('f-nome').value.trim();
+    const tipo = document.getElementById('f-tipo').value.trim();
+    const indirizzo = document.getElementById('f-indirizzo').value.trim();
+    const payload = {
+      nome_locale: nome,
+      tipo_locale: tipo,
+      stato: document.getElementById('f-stato').value,
+      indirizzo,
+      telefono: document.getElementById('f-telefono').value.trim(),
+      email: document.getElementById('f-email').value.trim(),
+      sommelier_nome: document.getElementById('f-somm-nome').value.trim(),
+      sommelier_contatto: document.getElementById('f-somm-contatto').value.trim(),
+      buyer_nome: document.getElementById('f-buyer-nome').value.trim(),
+      buyer_contatto: document.getElementById('f-buyer-contatto').value.trim(),
+      note: document.getElementById('f-note').value.trim(),
+      descrizione_auto: descrizioneAuto(nome, tipo),
+    };
+    if(indirizzo){
+      try{
+        const geo = await geocodeAddress(indirizzo);
+        if(geo){ payload.lat = geo.lat; payload.lng = geo.lng; }
+      }catch(_){}
+    }
+    let error;
+    if(cliente?.id){
+      ({ error } = await sb.from('clienti').update(payload).eq('id', cliente.id));
+    } else {
+      payload.agente_id = state.user.id;
+      ({ error } = await sb.from('clienti').insert(payload));
+    }
+    if(error){ toast('Errore salvataggio: '+error.message); return; }
+    closeModal(); toast('Cliente salvato'); await loadClienti(); renderClienti();
   });
 }
 
-async function onLogged(user){
-  state.user = user;
-  const { data:agente, error } = await sb.from('agenti').select('*').eq('id', user.id).maybeSingle();
-  if(error){ toast('Errore caricamento profilo agente','err'); }
-  state.agente = agente;
-  document.getElementById('login-screen').classList.add('hidden');
-  document.getElementById('app').classList.remove('hidden');
-  qs('#user-name').textContent = agente ? agente.nome : user.email;
-  await loadAgentiMap();
-  buildNav();
-  if(!location.hash || location.hash === '#/') location.hash = '#/dashboard';
-  else route();
+async function geocodeAddress(address){
+  const url = `https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${encodeURIComponent(address)}`;
+  const res = await fetch(url, { headers: { 'Accept-Language':'it' } });
+  const data = await res.json();
+  if(data && data[0]) return { lat: parseFloat(data[0].lat), lng: parseFloat(data[0].lon) };
+  return null;
 }
 
-function showLogin(){
-  document.getElementById('app').classList.add('hidden');
-  document.getElementById('login-screen').classList.remove('hidden');
-}
-
-function showTab(which){
-  qsa('#login-form,#signup-form,#reset-form').forEach(f=>f.classList.add('hidden'));
-  qsa('.login-tabs button').forEach(b=>b.classList.remove('active'));
-  if(which==='login'){ qs('#login-form').classList.remove('hidden'); qs('#tab-login').classList.add('active'); }
-  if(which==='signup'){ qs('#signup-form').classList.remove('hidden'); qs('#tab-signup').classList.add('active'); }
-  if(which==='reset'){ qs('#reset-form').classList.remove('hidden'); }
-  qs('#login-msg').textContent='';
-}
-qs('#tab-login').onclick = ()=>showTab('login');
-qs('#tab-signup').onclick = ()=>showTab('signup');
-qs('#btn-forgot').onclick = ()=>showTab('reset');
-qs('#btn-back-login').onclick = ()=>showTab('login');
-
-qs('#btn-login').onclick = async ()=>{
-  const email = qs('#li-email').value.trim(), pass = qs('#li-pass').value;
-  if(!email || !pass) return toast('Inserisci email e password','err');
-  const btn = qs('#btn-login'); btn.disabled=true; btn.innerHTML='<span class="spinner"></span>';
-  const { error } = await sb.auth.signInWithPassword({ email, password: pass });
-  btn.disabled=false; btn.textContent='Accedi';
-  if(error) qs('#login-msg').innerHTML = `<span style="color:var(--danger)">${esc(error.message)}</span>`;
-};
-
-qs('#btn-signup').onclick = async ()=>{
-  const nome = qs('#su-nome').value.trim(), email = qs('#su-email').value.trim(), pass = qs('#su-pass').value;
-  if(!nome || !email || !pass) return toast('Compila tutti i campi','err');
-  if(pass.length < 6) return toast('La password deve avere almeno 6 caratteri','err');
-  const btn = qs('#btn-signup'); btn.disabled=true; btn.innerHTML='<span class="spinner"></span>';
-  const { data, error } = await sb.auth.signUp({ email, password: pass, options:{ data:{ nome } } });
-  btn.disabled=false; btn.textContent='Crea account';
-  if(error) return qs('#login-msg').innerHTML = `<span style="color:var(--danger)">${esc(error.message)}</span>`;
-  if(!data.session){
-    qs('#login-msg').innerHTML = `<span style="color:var(--success)">Account creato. Controlla la tua email per confermare, poi accedi.</span>`;
-    showTab('login');
+window.openClienteDetail = function(id){
+  const c = state.clienti.find(x=>x.id===id);
+  if(!c) return;
+  const ordiniCliente = state.ordini.filter(o=>o.cliente_id===id);
+  openModal(`
+    <h2>${esc(c.nome_locale)} <span class="badge ${c.stato}">${c.stato}</span></h2>
+    <p class="meta">${esc(c.descrizione_auto || '')}</p>
+    <div class="tag-title">Contatti</div>
+    <div>${esc(c.indirizzo||'—')}<br>${esc(c.telefono||'')} ${c.email?('· '+esc(c.email)):''}</div>
+    <div class="tag-title">Sommelier</div>
+    <div>${esc(c.sommelier_nome||'—')} ${c.sommelier_contatto?('· '+esc(c.sommelier_contatto)):''}</div>
+    <div class="tag-title">Buyer</div>
+    <div>${esc(c.buyer_nome||'—')} ${c.buyer_contatto?('· '+esc(c.buyer_contatto)):''}</div>
+    ${c.lat && c.lng ? '<div id="map"></div>' : ''}
+    <div class="tag-title">Storico ordini (${ordiniCliente.length})</div>
+    ${ordiniCliente.length ? ordiniCliente.map(o=>`<div class="order-line"><span>${fmtDate(o.data_ordine)} · ${o.stato}</span><span>${fmtMoney(o.totale)}</span></div>`).join('') : '<p class="meta">Nessun ordine ancora.</p>'}
+    <div class="modal-actions">
+      <button class="btn-secondary" onclick="closeModal()">Chiudi</button>
+      <button class="btn-primary" onclick="closeModal();openClienteForm(${JSON.stringify(c).replace(/"/g,'&quot;')})">Modifica</button>
+    </div>
+  `);
+  if(c.lat && c.lng){
+    setTimeout(()=>{
+      const map = L.map('map', {zoomControl:false, dragging:false, scrollWheelZoom:false}).setView([c.lat, c.lng], 15);
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'&copy; OpenStreetMap'}).addTo(map);
+      L.marker([c.lat, c.lng]).addTo(map);
+    }, 50);
   }
 };
 
-qs('#btn-reset').onclick = async ()=>{
-  const email = qs('#rs-email').value.trim();
-  if(!email) return toast('Inserisci la tua email','err');
-  const { error } = await sb.auth.resetPasswordForEmail(email, { redirectTo: location.origin + location.pathname });
-  if(error) toast(error.message, 'err');
-  else { toast('Email di reset inviata', 'ok'); showTab('login'); }
-};
-
-qs('#btn-logout').onclick = async ()=>{ await sb.auth.signOut(); location.hash=''; };
-
-/* ===================== NAV / ROUTER ===================== */
-function buildNav(){
-  const side = document.getElementById('sidebar');
-  const tab = document.getElementById('tabbar');
-  side.innerHTML = NAV.map(n=>`<a href="#/${n.path}" data-path="${n.path}"><span>${n.ic}</span> ${n.label}</a>`).join('');
-  tab.innerHTML = NAV.map(n=>`<a href="#/${n.path}" data-path="${n.path}"><span class="ic">${n.ic}</span>${n.label}</a>`).join('');
-}
-function markActive(section){
-  qsa('#sidebar a, #tabbar a').forEach(a=>a.classList.toggle('active', a.dataset.path===section));
-}
-
-window.addEventListener('hashchange', route);
-
-async function route(){
-  const hash = location.hash.replace(/^#\/?/, '');
-  const [section, id, sub] = hash.split('/');
-  const main = document.getElementById('main');
-  main.innerHTML = '<div class="empty">Caricamento…</div>';
-  markActive(section || 'dashboard');
-  try{
-    if(!section || section==='dashboard') await viewDashboard(main);
-    else if(section==='clienti' && !id) await viewClientiList(main);
-    else if(section==='clienti' && id==='nuovo') await viewClienteForm(main, null);
-    else if(section==='clienti' && id) await viewClienteDetail(main, id, sub);
-    else if(section==='catalogo') await viewCatalogo(main);
-    else if(section==='ordini' && id==='nuovo') await viewOrdineForm(main);
-    else if(section==='ordini' && id) await viewOrdineDetail(main, id);
-    else if(section==='ordini') await viewOrdiniList(main);
-    else if(section==='analisi') await viewAnalisi(main);
-    else main.innerHTML = '<div class="empty">Pagina non trovata</div>';
-  }catch(e){
-    console.error(e);
-    main.innerHTML = `<div class="empty">Errore nel caricamento della pagina.<br><small>${esc(e.message||e)}</small></div>`;
-  }
-}
-
-async function loadAgentiMap(){
-  const { data } = await sb.from('agenti').select('id,nome,email,attivo');
-  state.agentiById = {};
-  (data||[]).forEach(a=> state.agentiById[a.id] = a);
-}
-function agenteName(id){ return state.agentiById[id]?.nome || '—'; }
-
-/* ===================== DASHBOARD ===================== */
-async function viewDashboard(main){
-  const uid = state.user.id;
-  const [{ data: clienti }, { data: ordini }, { data: riordinare }, { data: riproporre }] = await Promise.all([
-    sb.from('clienti').select('id,agente_id,stato'),
-    sb.from('ordini').select('id,agente_id,totale,stato,data_ordine').order('data_ordine',{ascending:false}).limit(500),
-    sb.from('v_da_riordinare').select('*').limit(6),
-    sb.from('v_da_riproporre').select('*').limit(6),
-  ]);
-  const mieiClienti = (clienti||[]).filter(c=>c.agente_id===uid).length;
-  const now = new Date(); const meseCorrente = now.getMonth(), annoCorrente = now.getFullYear();
-  const ordiniMese = (ordini||[]).filter(o=>{ const d=new Date(o.data_ordine); return d.getMonth()===meseCorrente && d.getFullYear()===annoCorrente && o.stato!=='annullato'; });
-  const totaleMese = ordiniMese.reduce((s,o)=>s+Number(o.totale||0),0);
-  const mieiOrdiniMese = ordiniMese.filter(o=>o.agente_id===uid).length;
-  const ultimiOrdini = (ordini||[]).slice(0,6);
-
-  main.innerHTML = `
-  <h1 class="page-title">Ciao, ${esc(state.agente?.nome?.split(' ')[0] || '')} 👋 <small>${fmtDate(new Date())}</small></h1>
-  <div class="kpi-row">
-    <div class="stat"><div class="num">${mieiClienti}</div><div class="label">I tuoi clienti</div></div>
-    <div class="stat"><div class="num">${euro(totaleMese)}</div><div class="label">Fatturato rete — mese corrente</div></div>
-    <div class="stat"><div class="num">${mieiOrdiniMese}</div><div class="label">Tuoi ordini questo mese</div></div>
-    <div class="stat"><div class="num">${(clienti||[]).length}</div><div class="label">Clienti totali rete</div></div>
-  </div>
-  <div class="grid cols-2">
-    <div class="card">
-      <h3>Ordini recenti</h3>
-      ${ultimiOrdini.length ? `<table><thead><tr><th>Data</th><th>Agente</th><th>Stato</th><th>Totale</th></tr></thead><tbody>
-        ${ultimiOrdini.map(o=>`<tr class="clickable" onclick="location.hash='#/ordini/${o.id}'"><td>${fmtDate(o.data_ordine)}</td><td>${esc(agenteName(o.agente_id))}</td><td><span class="badge ${o.stato}">${o.stato}</span></td><td>${euro(o.totale)}</td></tr>`).join('')}
-        </tbody></table>` : `<div class="empty">Nessun ordine ancora.</div>`}
-      <div style="margin-top:14px;"><a class="btn small" href="#/ordini/nuovo">+ Nuovo ordine</a></div>
-    </div>
-    <div class="card">
-      <h3>💡 Da riproporre (60+ giorni)</h3>
-      ${(riproporre||[]).length ? `<div>${riproporre.map(v=>`<div class="row-items"><div style="flex:1;"><b>${esc(v.nome)}</b><br><span class="muted" style="font-size:12px;">${esc(v.produttore||'')}</span></div><span class="muted" style="font-size:12px;">${v.ultima_vendita? fmtDate(v.ultima_vendita):'mai venduto'}</span></div>`).join('')}</div>` : `<div class="empty">Niente da segnalare.</div>`}
-      <h3 style="margin-top:20px;">📦 Scorte basse (venduti, ≤6 pz)</h3>
-      ${(riordinare||[]).length ? `<div>${riordinare.map(v=>`<div class="row-items"><div style="flex:1;"><b>${esc(v.nome)}</b></div><span class="badge sospeso">${v.quantita_disponibile} pz</span></div>`).join('')}</div>` : `<div class="empty">Nessuna scorta critica.</div>`}
-    </div>
-  </div>`;
-}
-
-/* ===================== CLIENTI ===================== */
-async function viewClientiList(main){
-  const { data, error } = await sb.from('clienti').select('*').order('nome_locale');
-  if(error) throw error;
-  state.clienti = data || [];
-  main.innerHTML = `
-  <h1 class="page-title">Clienti <small>${state.clienti.length} locali</small>
-    <a class="btn" href="#/clienti/nuovo">+ Nuovo cliente</a>
-  </h1>
-  <div class="searchbar">
-    <input type="text" id="cl-search" placeholder="Cerca per nome, città, sommelier...">
-    <select id="cl-filter-agente"><option value="">Tutti gli agenti</option>${Object.values(state.agentiById).map(a=>`<option value="${a.id}">${esc(a.nome)}</option>`).join('')}</select>
-    <select id="cl-filter-stato"><option value="">Tutti gli stati</option><option value="attivo">Attivo</option><option value="sospeso">Sospeso</option></select>
-    <button class="btn secondary small" id="cl-toggle-map">🗺️ Mappa</button>
-  </div>
-  <div id="cl-map-wrap" class="card hidden"><div class="map-box" id="cl-map"></div></div>
-  <div class="card" id="cl-table-wrap"></div>`;
-
-  const renderTable = ()=>{
-    const q = qs('#cl-search').value.trim().toLowerCase();
-    const agf = qs('#cl-filter-agente').value;
-    const stf = qs('#cl-filter-stato').value;
-    const rows = state.clienti.filter(c=>{
-      if(agf && c.agente_id!==agf) return false;
-      if(stf && c.stato!==stf) return false;
-      if(q){
-        const hay = [c.nome_locale,c.indirizzo,c.sommelier_nome,c.buyer_nome,c.tipo_locale].join(' ').toLowerCase();
-        if(!hay.includes(q)) return false;
-      }
-      return true;
-    });
-    qs('#cl-table-wrap').innerHTML = rows.length ? `<table><thead><tr><th>Locale</th><th>Tipo</th><th>Agente</th><th>Sommelier/Buyer</th><th>Stato</th></tr></thead><tbody>
-      ${rows.map(c=>`<tr class="clickable" onclick="location.hash='#/clienti/${c.id}'">
-        <td><b>${esc(c.nome_locale)}</b><br><span class="muted" style="font-size:12px;">${esc(c.indirizzo||'')}</span></td>
-        <td>${esc(c.tipo_locale||'—')}</td>
-        <td>${esc(agenteName(c.agente_id))}</td>
-        <td>${esc(c.sommelier_nome || c.buyer_nome || '—')}</td>
-        <td><span class="badge ${c.stato}">${esc(c.stato)}</span></td>
-      </tr>`).join('')}</tbody></table>` : `<div class="empty"><div class="ic">🔍</div>Nessun cliente trovato.</div>`;
-  };
-  renderTable();
-  qs('#cl-search').addEventListener('input', debounce(renderTable, 150));
-  qs('#cl-filter-agente').addEventListener('change', renderTable);
-  qs('#cl-filter-stato').addEventListener('change', renderTable);
-
-  let mapInited = false;
-  qs('#cl-toggle-map').onclick = ()=>{
-    const wrap = qs('#cl-map-wrap');
-    wrap.classList.toggle('hidden');
-    if(!wrap.classList.contains('hidden') && !mapInited){
-      mapInited = true;
-      const withCoords = state.clienti.filter(c=>c.lat && c.lng);
-      const map = L.map('cl-map').setView(withCoords[0] ? [withCoords[0].lat, withCoords[0].lng] : [45.4642, 9.19], 12);
-      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution:'&copy; OpenStreetMap' }).addTo(map);
-      withCoords.forEach(c=>{
-        L.marker([c.lat, c.lng]).addTo(map).bindPopup(`<b>${esc(c.nome_locale)}</b><br>${esc(c.indirizzo||'')}<br><a href="#/clienti/${c.id}">Apri scheda</a>`);
-      });
-      if(withCoords.length>1){ map.fitBounds(withCoords.map(c=>[c.lat,c.lng]), { padding:[30,30] }); }
-      setTimeout(()=>map.invalidateSize(), 200);
-    }
-  };
-}
-
-async function viewClienteForm(main, cliente){
-  const isEdit = !!cliente;
-  const canEdit = !isEdit || cliente.agente_id === state.user.id;
-  main.innerHTML = `
-  <h1 class="page-title">${isEdit? 'Modifica cliente':'Nuovo cliente'} <a class="btn secondary small" href="#/clienti${isEdit? '/'+cliente.id:''}">Annulla</a></h1>
-  <div class="card" style="max-width:640px;">
-    <div class="grid cols-2">
-      <div class="field"><label>Nome locale *</label><input id="f-nome" value="${esc(cliente?.nome_locale||'')}"></div>
-      <div class="field"><label>Tipo locale</label>
-        <select id="f-tipo">
-          ${['','Ristorante','Trattoria','Enoteca','Wine Bar','Hotel','Pizzeria','Altro'].map(t=>`<option ${cliente?.tipo_locale===t?'selected':''}>${t}</option>`).join('')}
-        </select>
-      </div>
-    </div>
-    <div class="field"><label>Indirizzo</label><input id="f-indirizzo" value="${esc(cliente?.indirizzo||'')}" placeholder="Via, civico, città"></div>
-    <div class="grid cols-2">
-      <div class="field"><label>Telefono</label><input id="f-tel" value="${esc(cliente?.telefono||'')}"></div>
-      <div class="field"><label>Email</label><input id="f-email" value="${esc(cliente?.email||'')}"></div>
-    </div>
-    <div class="grid cols-2">
-      <div class="field"><label>Sommelier — nome</label><input id="f-somm-nome" value="${esc(cliente?.sommelier_nome||'')}"></div>
-      <div class="field"><label>Sommelier — contatto</label><input id="f-somm-contatto" value="${esc(cliente?.sommelier_contatto||'')}"></div>
-    </div>
-    <div class="grid cols-2">
-      <div class="field"><label>Buyer — nome</label><input id="f-buyer-nome" value="${esc(cliente?.buyer_nome||'')}"></div>
-      <div class="field"><label>Buyer — contatto</label><input id="f-buyer-contatto" value="${esc(cliente?.buyer_contatto||'')}"></div>
-    </div>
-    <div class="field"><label>Stato</label>
-      <select id="f-stato"><option value="attivo" ${cliente?.stato==='attivo'?'selected':''}>Attivo</option><option value="sospeso" ${cliente?.stato==='sospeso'?'selected':''}>Sospeso</option></select>
-    </div>
-    <div class="field"><label>Descrizione automatica del locale</label>
-      <textarea id="f-descr">${esc(cliente?.descrizione_auto||'')}</textarea>
-      <button type="button" class="link-btn" id="btn-gen-descr" style="margin-top:6px;">✨ Genera automaticamente dal nome</button>
-    </div>
-    <div class="field"><label>Note</label><textarea id="f-note">${esc(cliente?.note||'')}</textarea></div>
-    <button class="btn" id="btn-save-cliente" ${!canEdit?'disabled':''}>${isEdit?'Salva modifiche':'Crea cliente'}</button>
-    ${!canEdit ? '<p class="muted" style="font-size:12.5px;margin-top:10px;">Questo cliente è gestito da un collega: non puoi modificarne i dati.</p>' : ''}
-  </div>`;
-
-  qs('#btn-gen-descr').onclick = ()=>{
-    const nome = qs('#f-nome').value.trim();
-    if(!nome) return toast('Inserisci prima il nome del locale','err');
-    qs('#f-descr').value = genDescrizioneAuto(nome, qs('#f-tipo').value);
-  };
-
-  qs('#btn-save-cliente').onclick = async ()=>{
-    const nome_locale = qs('#f-nome').value.trim();
-    if(!nome_locale) return toast('Il nome del locale è obbligatorio','err');
-    const btn = qs('#btn-save-cliente'); btn.disabled = true;
-    const indirizzo = qs('#f-indirizzo').value.trim();
-    let lat = cliente?.lat || null, lng = cliente?.lng || null;
-    const indirizzoCambiato = indirizzo && indirizzo !== (cliente?.indirizzo||'');
-    if(indirizzo && (indirizzoCambiato || !lat)){
-      const geo = await geocode(indirizzo);
-      if(geo){ lat = geo.lat; lng = geo.lng; }
-    }
-    const payload = {
-      nome_locale, tipo_locale: qs('#f-tipo').value || null, indirizzo: indirizzo || null,
-      lat, lng,
-      telefono: qs('#f-tel').value.trim() || null, email: qs('#f-email').value.trim() || null,
-      sommelier_nome: qs('#f-somm-nome').value.trim() || null, sommelier_contatto: qs('#f-somm-contatto').value.trim() || null,
-      buyer_nome: qs('#f-buyer-nome').value.trim() || null, buyer_contatto: qs('#f-buyer-contatto').value.trim() || null,
-      descrizione_auto: qs('#f-descr').value.trim() || null, note: qs('#f-note').value.trim() || null,
-      stato: qs('#f-stato').value, updated_at: new Date().toISOString(),
-    };
-    let res;
-    if(isEdit) res = await sb.from('clienti').update(payload).eq('id', cliente.id);
-    else res = await sb.from('clienti').insert({ ...payload, agente_id: state.user.id });
-    btn.disabled = false;
-    if(res.error) return toast('Errore salvataggio: '+res.error.message, 'err');
-    toast('Cliente salvato', 'ok');
-    location.hash = isEdit ? `#/clienti/${cliente.id}` : '#/clienti';
-  };
-}
-
-async function viewClienteDetail(main, id){
-  const { data: cliente, error } = await sb.from('clienti').select('*').eq('id', id).maybeSingle();
-  if(error || !cliente){ main.innerHTML = '<div class="empty">Cliente non trovato.</div>'; return; }
-  const canEdit = cliente.agente_id === state.user.id;
-  const { data: ordini } = await sb.from('ordini').select('*').eq('cliente_id', id).order('data_ordine',{ascending:false});
-  const { data: vstats } = await sb.from('v_vendite_per_cliente').select('*').eq('cliente_id', id).maybeSingle();
-
-  main.innerHTML = `
-  <h1 class="page-title">${esc(cliente.nome_locale)} <span class="badge ${cliente.stato}">${cliente.stato}</span>
-    <span style="margin-left:auto;display:flex;gap:8px;">
-      <a class="btn secondary small" href="#/clienti">← Elenco</a>
-      ${canEdit ? `<a class="btn small" href="#/clienti/${cliente.id}/modifica" id="edit-link">Modifica</a>` : ''}
-      <a class="btn small" href="#/ordini/nuovo?cliente=${cliente.id}">+ Nuovo ordine</a>
-    </span>
-  </h1>
-  <div class="grid cols-2">
-    <div class="card">
-      <h3>Anagrafica</h3>
-      <div class="row-items"><span class="muted">Tipo</span><span style="margin-left:auto;">${esc(cliente.tipo_locale||'—')}</span></div>
-      <div class="row-items"><span class="muted">Indirizzo</span><span style="margin-left:auto;">${esc(cliente.indirizzo||'—')}</span></div>
-      <div class="row-items"><span class="muted">Telefono</span><span style="margin-left:auto;">${esc(cliente.telefono||'—')}</span></div>
-      <div class="row-items"><span class="muted">Email</span><span style="margin-left:auto;">${esc(cliente.email||'—')}</span></div>
-      <div class="row-items"><span class="muted">Sommelier</span><span style="margin-left:auto;">${esc(cliente.sommelier_nome||'—')} ${cliente.sommelier_contatto?`(${esc(cliente.sommelier_contatto)})`:''}</span></div>
-      <div class="row-items"><span class="muted">Buyer</span><span style="margin-left:auto;">${esc(cliente.buyer_nome||'—')} ${cliente.buyer_contatto?`(${esc(cliente.buyer_contatto)})`:''}</span></div>
-      <div class="row-items"><span class="muted">Agente</span><span style="margin-left:auto;">${esc(agenteName(cliente.agente_id))}</span></div>
-      ${cliente.descrizione_auto ? `<div style="margin-top:12px;padding-top:12px;border-top:1px solid #f0f0f2;"><span class="muted" style="font-size:12px;">Descrizione</span><p style="margin:4px 0 0;">${esc(cliente.descrizione_auto)}</p></div>` : ''}
-      ${cliente.note ? `<div style="margin-top:12px;padding-top:12px;border-top:1px solid #f0f0f2;"><span class="muted" style="font-size:12px;">Note</span><p style="margin:4px 0 0;">${esc(cliente.note)}</p></div>` : ''}
-    </div>
-    <div class="card">
-      <h3>Posizione</h3>
-      ${cliente.lat && cliente.lng ? `<div class="map-box" id="one-map"></div>` : `<div class="empty">Indirizzo non geolocalizzato.</div>`}
-      <h3 style="margin-top:20px;">Riepilogo vendite</h3>
-      <div class="row-items"><span class="muted">Ordini totali</span><span style="margin-left:auto;"><b>${vstats?.numero_ordini||0}</b></span></div>
-      <div class="row-items"><span class="muted">Totale speso</span><span style="margin-left:auto;"><b>${euro(vstats?.totale_speso||0)}</b></span></div>
-      <div class="row-items"><span class="muted">Ultimo ordine</span><span style="margin-left:auto;">${fmtDate(vstats?.ultimo_ordine)}</span></div>
-    </div>
-  </div>
-  <div class="card">
-    <h3>Storico ordini</h3>
-    ${ordini && ordini.length ? `<table><thead><tr><th>Data</th><th>Agente</th><th>Stato</th><th>Totale</th></tr></thead><tbody>
-      ${ordini.map(o=>`<tr class="clickable" onclick="location.hash='#/ordini/${o.id}'"><td>${fmtDate(o.data_ordine)}</td><td>${esc(agenteName(o.agente_id))}</td><td><span class="badge ${o.stato}">${o.stato}</span></td><td>${euro(o.totale)}</td></tr>`).join('')}
-    </tbody></table>` : `<div class="empty">Nessun ordine per questo cliente.</div>`}
-  </div>`;
-
-  if(cliente.lat && cliente.lng){
-    const map = L.map('one-map', { zoomControl:true, scrollWheelZoom:false }).setView([cliente.lat, cliente.lng], 15);
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution:'&copy; OpenStreetMap' }).addTo(map);
-    L.marker([cliente.lat, cliente.lng]).addTo(map);
-    setTimeout(()=>map.invalidateSize(), 150);
-  }
-  const editLink = qs('#edit-link');
-  if(editLink) editLink.onclick = (e)=>{ e.preventDefault(); openEditRoute(cliente); };
-}
-function openEditRoute(cliente){
-  history.replaceState(null,'','#/clienti/'+cliente.id+'/modifica');
-  viewClienteForm(document.getElementById('main'), cliente);
-}
-/* handle /clienti/:id/modifica via route() dispatch */
-const _origRoute = route;
-
-/* ===================== CATALOGO ===================== */
-async function viewCatalogo(main){
-  const { data, error } = await sb.from('vini').select('*').order('nome');
-  if(error) throw error;
+/* ================= CATALOGO VINI ================= */
+async function loadVini(){
+  const { data, error } = await sb.from('vini').select('*').eq('attivo', true).order('nome');
+  if(error){ toast('Errore caricamento catalogo'); return; }
   state.vini = data || [];
-  main.innerHTML = `
-  <h1 class="page-title">Catalogo vini <small>${state.vini.length} referenze</small>
-    <button class="btn" id="btn-new-vino">+ Nuova referenza</button>
-  </h1>
-  <div class="searchbar">
-    <input type="text" id="v-search" placeholder="Cerca per nome, produttore, zona, codice...">
-    <select id="v-filter-tipo"><option value="">Tutte le tipologie</option></select>
-  </div>
-  <div class="card" id="v-table-wrap"></div>
-  <div id="vino-modal-root"></div>`;
-
-  const tipi = [...new Set(state.vini.map(v=>v.tipologia).filter(Boolean))].sort();
-  qs('#v-filter-tipo').innerHTML += tipi.map(t=>`<option>${esc(t)}</option>`).join('');
-
-  const renderTable = ()=>{
-    const q = qs('#v-search').value.trim().toLowerCase();
-    const tf = qs('#v-filter-tipo').value;
-    const rows = state.vini.filter(v=>{
-      if(tf && v.tipologia!==tf) return false;
-      if(q){ const hay=[v.nome,v.produttore,v.zona,v.referenza_codice].join(' ').toLowerCase(); if(!hay.includes(q)) return false; }
-      return true;
-    });
-    qs('#v-table-wrap').innerHTML = rows.length ? `<table><thead><tr><th>Referenza</th><th>Tipologia</th><th>Zona</th><th>Annata</th><th>Prezzo</th><th>Disponibili</th><th></th></tr></thead><tbody>
-      ${rows.map(v=>`<tr>
-        <td><b>${esc(v.nome)}</b><br><span class="muted" style="font-size:12px;">${esc(v.produttore||'')}${v.referenza_codice?' · '+esc(v.referenza_codice):''}</span></td>
-        <td>${esc(v.tipologia||'—')}</td><td>${esc(v.zona||'—')}</td><td>${v.annata||'—'}</td>
-        <td>${euro(v.prezzo_listino)}</td>
-        <td>${v.quantita_disponibile<=6? `<span class="badge sospeso">${v.quantita_disponibile}</span>` : v.quantita_disponibile}</td>
-        <td><button class="btn small secondary" onclick="openVinoModal('${v.id}')">Modifica</button></td>
-      </tr>`).join('')}</tbody></table>` : `<div class="empty"><div class="ic">🍇</div>Nessuna referenza trovata.</div>`;
-  };
-  renderTable();
-  qs('#v-search').addEventListener('input', debounce(renderTable,150));
-  qs('#v-filter-tipo').addEventListener('change', renderTable);
-  qs('#btn-new-vino').onclick = ()=>openVinoModal(null);
-  window.__renderCatalogo = renderTable;
 }
 
-function openVinoModal(id){
-  const vino = id ? state.vini.find(v=>v.id===id) : null;
-  const root = qs('#vino-modal-root');
-  root.innerHTML = `
-  <div style="position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:100;display:flex;align-items:center;justify-content:center;padding:16px;" id="vm-backdrop">
-    <div class="card" style="max-width:480px;width:100%;max-height:88vh;overflow:auto;">
-      <h3>${vino?'Modifica referenza':'Nuova referenza'}</h3>
-      <div class="grid cols-2">
-        <div class="field"><label>Nome *</label><input id="vm-nome" value="${esc(vino?.nome||'')}"></div>
-        <div class="field"><label>Produttore</label><input id="vm-prod" value="${esc(vino?.produttore||'')}"></div>
-      </div>
-      <div class="grid cols-3">
-        <div class="field"><label>Tipologia</label><input id="vm-tipo" value="${esc(vino?.tipologia||'')}" placeholder="Rosso, Bianco..."></div>
-        <div class="field"><label>Zona</label><input id="vm-zona" value="${esc(vino?.zona||'')}"></div>
-        <div class="field"><label>Annata</label><input id="vm-annata" type="number" value="${vino?.annata||''}"></div>
-      </div>
-      <div class="grid cols-3">
-        <div class="field"><label>Prezzo listino</label><input id="vm-prezzo" type="number" step="0.01" value="${vino?.prezzo_listino||''}"></div>
-        <div class="field"><label>Quantità disp.</label><input id="vm-qta" type="number" value="${vino?.quantita_disponibile??0}"></div>
-        <div class="field"><label>Codice</label><input id="vm-codice" value="${esc(vino?.referenza_codice||'')}"></div>
-      </div>
-      <div class="field"><label>Descrizione</label><textarea id="vm-descr">${esc(vino?.descrizione||'')}</textarea></div>
-      <div style="display:flex;gap:10px;justify-content:flex-end;">
-        <button class="btn secondary" id="vm-cancel">Annulla</button>
-        <button class="btn" id="vm-save">Salva</button>
-      </div>
+function renderVini(){
+  const q = (document.getElementById('vino-search').value||'').toLowerCase();
+  const list = state.vini.filter(v=>!q || (v.nome||'').toLowerCase().includes(q) || (v.produttore||'').toLowerCase().includes(q) || (v.tipologia||'').toLowerCase().includes(q));
+  const el = document.getElementById('vini-list');
+  if(!list.length){ el.innerHTML = `<div class="empty-state">Nessuna referenza trovata.</div>`; return; }
+  el.innerHTML = list.map(v=>`
+    <div class="list-item" onclick="openVinoForm(${JSON.stringify(v).replace(/"/g,'&quot;')})">
+      <h3>${esc(v.nome)} ${v.annata?('· '+v.annata):''}</h3>
+      <div class="meta">${esc(v.produttore||'—')} · ${esc(v.tipologia||'—')}</div>
+      <div class="meta">${fmtMoney(v.prezzo_listino)} · disponibili: ${v.quantita_disponibile}</div>
     </div>
-  </div>`;
-  qs('#vm-backdrop').onclick = (e)=>{ if(e.target.id==='vm-backdrop') root.innerHTML=''; };
-  qs('#vm-cancel').onclick = ()=> root.innerHTML='';
-  qs('#vm-save').onclick = async ()=>{
-    const nome = qs('#vm-nome').value.trim();
-    if(!nome) return toast('Il nome è obbligatorio','err');
+  `).join('');
+}
+document.getElementById('vino-search').addEventListener('input', renderVini);
+document.getElementById('new-vino-btn').addEventListener('click', ()=>openVinoForm());
+
+window.openVinoForm = function(vino){
+  const v = vino || {};
+  openModal(`
+    <h2>${vino ? 'Modifica referenza' : 'Nuova referenza'}</h2>
+    <form id="vino-form">
+      <div class="form-row"><div><label>Nome *</label><input required id="v-nome" value="${esc(v.nome)}"></div><div><label>Annata</label><input type="number" id="v-annata" value="${v.annata||''}"></div></div>
+      <div class="form-row"><div><label>Produttore</label><input id="v-produttore" value="${esc(v.produttore)}"></div><div><label>Zona</label><input id="v-zona" value="${esc(v.zona)}"></div></div>
+      <div class="form-row"><div><label>Tipologia</label><input id="v-tipologia" placeholder="rosso, bianco, bolle..." value="${esc(v.tipologia)}"></div><div><label>Codice referenza</label><input id="v-codice" value="${esc(v.referenza_codice)}"></div></div>
+      <div class="form-row"><div><label>Prezzo listino (€)</label><input type="number" step="0.01" id="v-prezzo" value="${v.prezzo_listino||''}"></div><div><label>Quantità disponibile</label><input type="number" id="v-qta" value="${v.quantita_disponibile??0}"></div></div>
+      <div class="form-row full"><div><label>Descrizione</label><textarea id="v-desc" rows="2">${esc(v.descrizione)}</textarea></div></div>
+      <div class="modal-actions">
+        ${vino ? '<button type="button" class="btn-danger" id="v-delete">Elimina</button>' : ''}
+        <button type="button" class="btn-secondary" onclick="closeModal()">Annulla</button>
+        <button type="submit" class="btn-primary">Salva</button>
+      </div>
+    </form>
+  `);
+  if(vino){
+    document.getElementById('v-delete').addEventListener('click', async ()=>{
+      if(!confirm('Eliminare questa referenza?')) return;
+      const { error } = await sb.from('vini').update({attivo:false}).eq('id', vino.id);
+      if(error){ toast('Errore: '+error.message); return; }
+      closeModal(); toast('Referenza rimossa'); await loadVini(); renderVini();
+    });
+  }
+  document.getElementById('vino-form').addEventListener('submit', async (e)=>{
+    e.preventDefault();
     const payload = {
-      nome, produttore: qs('#vm-prod').value.trim()||null, tipologia: qs('#vm-tipo').value.trim()||null,
-      zona: qs('#vm-zona').value.trim()||null, annata: qs('#vm-annata').value? Number(qs('#vm-annata').value):null,
-      prezzo_listino: qs('#vm-prezzo').value? Number(qs('#vm-prezzo').value):null,
-      quantita_disponibile: Number(qs('#vm-qta').value||0), referenza_codice: qs('#vm-codice').value.trim()||null,
-      descrizione: qs('#vm-descr').value.trim()||null, updated_at: new Date().toISOString(),
+      nome: document.getElementById('v-nome').value.trim(),
+      annata: document.getElementById('v-annata').value ? parseInt(document.getElementById('v-annata').value) : null,
+      produttore: document.getElementById('v-produttore').value.trim(),
+      zona: document.getElementById('v-zona').value.trim(),
+      tipologia: document.getElementById('v-tipologia').value.trim(),
+      referenza_codice: document.getElementById('v-codice').value.trim() || null,
+      prezzo_listino: parseFloat(document.getElementById('v-prezzo').value) || 0,
+      quantita_disponibile: parseInt(document.getElementById('v-qta').value) || 0,
+      descrizione: document.getElementById('v-desc').value.trim(),
     };
-    const res = vino ? await sb.from('vini').update(payload).eq('id', vino.id) : await sb.from('vini').insert(payload);
-    if(res.error) return toast('Errore: '+res.error.message,'err');
-    toast('Referenza salvata','ok');
-    root.innerHTML='';
-    await viewCatalogo(document.getElementById('main'));
-  };
+    let error;
+    if(vino?.id){ ({ error } = await sb.from('vini').update(payload).eq('id', vino.id)); }
+    else { ({ error } = await sb.from('vini').insert(payload)); }
+    if(error){ toast('Errore salvataggio: '+error.message); return; }
+    closeModal(); toast('Referenza salvata'); await loadVini(); renderVini();
+  });
+};
+
+/* ================= ORDINI ================= */
+async function loadOrdini(){
+  const { data, error } = await sb.from('ordini').select('*, clienti(nome_locale), agenti(nome), ordini_righe(*, vini(nome))').order('data_ordine', {ascending:false});
+  if(error){ toast('Errore caricamento ordini'); return; }
+  state.ordini = data || [];
 }
 
-/* ===================== ORDINI ===================== */
-async function viewOrdiniList(main){
-  const { data, error } = await sb.from('ordini').select('*, clienti(nome_locale)').order('data_ordine',{ascending:false});
-  if(error) throw error;
-  main.innerHTML = `
-  <h1 class="page-title">Ordini <small>${(data||[]).length} totali</small><a class="btn" href="#/ordini/nuovo">+ Nuovo ordine</a></h1>
-  <div class="searchbar">
-    <input type="text" id="o-search" placeholder="Cerca per cliente...">
-    <select id="o-filter-stato"><option value="">Tutti gli stati</option><option value="bozza">Bozza</option><option value="confermato">Confermato</option><option value="annullato">Annullato</option></select>
-    <select id="o-filter-agente"><option value="">Tutti gli agenti</option>${Object.values(state.agentiById).map(a=>`<option value="${a.id}">${esc(a.nome)}</option>`).join('')}</select>
-  </div>
-  <div class="card" id="o-table-wrap"></div>`;
-  const rowsAll = data||[];
-  const render = ()=>{
-    const q = qs('#o-search').value.trim().toLowerCase();
-    const sf = qs('#o-filter-stato').value;
-    const af = qs('#o-filter-agente').value;
-    const rows = rowsAll.filter(o=>{
-      if(sf && o.stato!==sf) return false;
-      if(af && o.agente_id!==af) return false;
-      if(q && !(o.clienti?.nome_locale||'').toLowerCase().includes(q)) return false;
-      return true;
+function renderOrdini(){
+  const statoF = document.getElementById('ordine-filter-stato').value;
+  const list = state.ordini.filter(o=>!statoF || o.stato===statoF);
+  const el = document.getElementById('ordini-list');
+  if(!list.length){ el.innerHTML = `<div class="empty-state">Nessun ordine trovato.</div>`; return; }
+  el.innerHTML = `<div class="card"><table><thead><tr><th>Data</th><th>Cliente</th><th>Agente</th><th>Stato</th><th>Totale</th></tr></thead><tbody>
+    ${list.map(o=>`<tr style="cursor:pointer" onclick="openOrdineDetail('${o.id}')">
+      <td>${fmtDate(o.data_ordine)}</td><td>${esc(o.clienti?.nome_locale||'—')}</td><td>${esc(o.agenti?.nome||'—')}</td>
+      <td><span class="badge ${o.stato==='annullato'?'inattivo':(o.stato==='evaso'?'attivo':'prospect')}">${o.stato}</span></td>
+      <td>${fmtMoney(o.totale)}</td>
+    </tr>`).join('')}
+  </tbody></table></div>`;
+}
+document.getElementById('ordine-filter-stato').addEventListener('change', renderOrdini);
+
+window.openOrdineDetail = function(id){
+  const o = state.ordini.find(x=>x.id===id);
+  if(!o) return;
+  openModal(`
+    <h2>Ordine · ${esc(o.clienti?.nome_locale||'—')}</h2>
+    <p class="meta">${fmtDate(o.data_ordine)} · agente ${esc(o.agenti?.nome||'—')}</p>
+    <label>Stato</label>
+    <select id="o-stato">
+      ${['bozza','confermato','evaso','annullato'].map(s=>`<option value="${s}" ${o.stato===s?'selected':''}>${s}</option>`).join('')}
+    </select>
+    <div class="tag-title">Righe</div>
+    ${(o.ordini_righe||[]).map(r=>`<div class="order-line"><span>${esc(r.vini?.nome||'—')} × ${r.quantita}</span><span>${fmtMoney(r.quantita*r.prezzo_unitario)}</span></div>`).join('')}
+    <div class="total-row"><span>Totale</span><span>${fmtMoney(o.totale)}</span></div>
+    <div class="modal-actions">
+      <button class="btn-secondary" onclick="closeModal()">Chiudi</button>
+      <button class="btn-primary" id="o-save">Aggiorna stato</button>
+    </div>
+  `);
+  document.getElementById('o-save').addEventListener('click', async ()=>{
+    const nuovoStato = document.getElementById('o-stato').value;
+    const { error } = await sb.from('ordini').update({stato:nuovoStato}).eq('id', o.id);
+    if(error){ toast('Errore: '+error.message); return; }
+    closeModal(); toast('Ordine aggiornato'); await loadOrdini(); renderOrdini();
+  });
+};
+
+document.getElementById('new-ordine-btn').addEventListener('click', ()=>{
+  if(!state.clienti.length){ toast('Aggiungi prima un cliente'); return; }
+  if(!state.vini.length){ toast('Aggiungi prima delle referenze al catalogo'); return; }
+  state.currentOrderLines = {};
+  openModal(`
+    <h2>Nuovo ordine</h2>
+    <label>Cliente</label>
+    <select id="no-cliente">${state.clienti.map(c=>`<option value="${c.id}">${esc(c.nome_locale)}</option>`).join('')}</select>
+    <div class="tag-title">Seleziona referenze</div>
+    <div id="no-vini-list">${state.vini.map(v=>`
+      <div class="wine-pick">
+        <div>${esc(v.nome)} <span class="meta">${fmtMoney(v.prezzo_listino)}</span></div>
+        <input type="number" min="0" value="0" class="qty" data-vino="${v.id}" data-prezzo="${v.prezzo_listino}">
+      </div>`).join('')}</div>
+    <div class="total-row"><span>Totale</span><span id="no-totale">${fmtMoney(0)}</span></div>
+    <div class="modal-actions">
+      <button type="button" class="btn-secondary" onclick="closeModal()">Annulla</button>
+      <button type="button" class="btn-primary" id="no-save">Crea ordine</button>
+    </div>
+  `);
+  const recalc = ()=>{
+    let tot=0;
+    document.querySelectorAll('#no-vini-list .qty').forEach(inp=>{ tot += (parseInt(inp.value)||0) * parseFloat(inp.dataset.prezzo); });
+    document.getElementById('no-totale').textContent = fmtMoney(tot);
+  };
+  document.querySelectorAll('#no-vini-list .qty').forEach(inp=>inp.addEventListener('input', recalc));
+  document.getElementById('no-save').addEventListener('click', async ()=>{
+    const clienteId = document.getElementById('no-cliente').value;
+    const righe = [];
+    document.querySelectorAll('#no-vini-list .qty').forEach(inp=>{
+      const qta = parseInt(inp.value)||0;
+      if(qta>0) righe.push({ vino_id: inp.dataset.vino, quantita: qta, prezzo_unitario: parseFloat(inp.dataset.prezzo) });
     });
-    qs('#o-table-wrap').innerHTML = rows.length ? `<table><thead><tr><th>Data</th><th>Cliente</th><th>Agente</th><th>Stato</th><th>Totale</th></tr></thead><tbody>
-      ${rows.map(o=>`<tr class="clickable" onclick="location.hash='#/ordini/${o.id}'"><td>${fmtDateTime(o.data_ordine)}</td><td>${esc(o.clienti?.nome_locale||'—')}</td><td>${esc(agenteName(o.agente_id))}</td><td><span class="badge ${o.stato}">${o.stato}</span></td><td>${euro(o.totale)}</td></tr>`).join('')}
-    </tbody></table>` : `<div class="empty">Nessun ordine trovato.</div>`;
-  };
-  render();
-  qs('#o-search').addEventListener('input', debounce(render,150));
-  qs('#o-filter-stato').addEventListener('change', render);
-  qs('#o-filter-agente').addEventListener('change', render);
-}
+    if(!righe.length){ toast('Seleziona almeno una referenza'); return; }
+    const { data: ordine, error } = await sb.from('ordini').insert({ cliente_id: clienteId, agente_id: state.user.id, stato:'confermato' }).select().single();
+    if(error){ toast('Errore: '+error.message); return; }
+    const { error: err2 } = await sb.from('ordini_righe').insert(righe.map(r=>({...r, ordine_id: ordine.id})));
+    if(err2){ toast('Errore righe: '+err2.message); return; }
+    closeModal(); toast('Ordine creato'); await Promise.all([loadOrdini(), loadVini()]); renderOrdini(); renderVini();
+  });
+});
 
-async function viewOrdineForm(main){
-  const params = new URLSearchParams(location.hash.split('?')[1]||'');
-  const clientePreselect = params.get('cliente');
-  const [{ data: clienti }, { data: vini }] = await Promise.all([
-    sb.from('clienti').select('id,nome_locale').order('nome_locale'),
-    sb.from('vini').select('*').eq('attivo', true).order('nome'),
+/* ================= ANALISI ================= */
+async function renderAnalisi(){
+  const [riordinare, riproporre] = await Promise.all([
+    sb.from('v_da_riordinare').select('*').limit(15),
+    sb.from('v_da_riproporre').select('*').limit(15),
   ]);
-  let righe = [];
-  main.innerHTML = `
-  <h1 class="page-title">Nuovo ordine <a class="btn secondary small" href="#/ordini">Annulla</a></h1>
-  <div class="card" style="max-width:760px;">
-    <div class="field"><label>Cliente *</label>
-      <select id="o-cliente">
-        <option value="">Seleziona cliente...</option>
-        ${(clienti||[]).map(c=>`<option value="${c.id}" ${c.id===clientePreselect?'selected':''}>${esc(c.nome_locale)}</option>`).join('')}
-      </select>
-    </div>
-    <div class="field"><label>Note</label><textarea id="o-note"></textarea></div>
-    <h3>Righe ordine</h3>
-    <div class="grid cols-3">
-      <div class="field" style="grid-column:span 2;"><label>Referenza</label>
-        <select id="o-vino-sel"><option value="">Seleziona vino...</option>${(vini||[]).map(v=>`<option value="${v.id}" data-prezzo="${v.prezzo_listino||0}" data-qta="${v.quantita_disponibile}">${esc(v.nome)}${v.produttore?' — '+esc(v.produttore):''} (disp. ${v.quantita_disponibile})</option>`).join('')}</select>
-      </div>
-      <div class="field"><label>Quantità</label><input type="number" id="o-vino-qta" min="1" value="1"></div>
-    </div>
-    <button class="btn secondary small" id="o-add-riga">+ Aggiungi al carrello</button>
-    <div id="o-righe-wrap" style="margin-top:16px;"></div>
-    <div style="text-align:right;font-size:18px;font-weight:700;margin-top:10px;">Totale: <span id="o-totale">€ 0,00</span></div>
-    <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:16px;">
-      <button class="btn secondary" id="o-save-bozza">Salva come bozza</button>
-      <button class="btn" id="o-save-confermato">Conferma ordine</button>
-    </div>
-  </div>`;
-
-  const renderRighe = ()=>{
-    qs('#o-righe-wrap').innerHTML = righe.length ? `<table><thead><tr><th>Vino</th><th>Qtà</th><th>Prezzo unit.</th><th>Subtot.</th><th></th></tr></thead><tbody>
-      ${righe.map((r,i)=>`<tr><td>${esc(r.nome)}</td><td>${r.quantita}</td><td>${euro(r.prezzo_unitario)}</td><td>${euro(r.quantita*r.prezzo_unitario)}</td><td><button class="link-btn" onclick="removeRiga(${i})">rimuovi</button></td></tr>`).join('')}
-    </tbody></table>` : `<div class="empty">Carrello vuoto.</div>`;
-    const tot = righe.reduce((s,r)=>s+r.quantita*r.prezzo_unitario,0);
-    qs('#o-totale').textContent = euro(tot);
-  };
-  window.removeRiga = (i)=>{ righe.splice(i,1); renderRighe(); };
-
-  qs('#o-add-riga').onclick = ()=>{
-    const sel = qs('#o-vino-sel');
-    const opt = sel.selectedOptions[0];
-    if(!sel.value) return toast('Seleziona un vino','err');
-    const qta = Number(qs('#o-vino-qta').value||1);
-    if(qta<1) return toast('Quantità non valida','err');
-    righe.push({ vino_id: sel.value, nome: opt.textContent, prezzo_unitario: Number(opt.dataset.prezzo||0), quantita: qta });
-    renderRighe();
-    sel.value=''; qs('#o-vino-qta').value=1;
-  };
-  renderRighe();
-
-  async function salva(stato){
-    const cliente_id = qs('#o-cliente').value;
-    if(!cliente_id) return toast('Seleziona un cliente','err');
-    if(!righe.length) return toast('Aggiungi almeno una referenza','err');
-    const totale = righe.reduce((s,r)=>s+r.quantita*r.prezzo_unitario,0);
-    const { data: ordine, error } = await sb.from('ordini').insert({
-      cliente_id, agente_id: state.user.id, stato, totale, note: qs('#o-note').value.trim()||null,
-    }).select().single();
-    if(error) return toast('Errore creazione ordine: '+error.message,'err');
-    const righeIns = righe.map(r=>({ ordine_id: ordine.id, vino_id: r.vino_id, quantita: r.quantita, prezzo_unitario: r.prezzo_unitario }));
-    const { error: err2 } = await sb.from('ordini_righe').insert(righeIns);
-    if(err2) return toast('Errore righe ordine: '+err2.message,'err');
-    if(stato==='confermato'){
-      for(const r of righe){
-        const v = (vini||[]).find(x=>x.id===r.vino_id);
-        if(v) await sb.from('vini').update({ quantita_disponibile: Math.max(0, v.quantita_disponibile - r.quantita) }).eq('id', v.id);
-      }
-    }
-    toast('Ordine salvato','ok');
-    location.hash = '#/ordini/'+ordine.id;
-  }
-  qs('#o-save-bozza').onclick = ()=>salva('bozza');
-  qs('#o-save-confermato').onclick = ()=>salva('confermato');
+  const totOrdini = state.ordini.filter(o=>o.stato!=='annullato').length;
+  const totFatturato = state.ordini.filter(o=>o.stato!=='annullato').reduce((s,o)=>s+parseFloat(o.totale||0),0);
+  const clientiAttivi = state.clienti.filter(c=>c.stato==='attivo').length;
+  document.getElementById('analisi-stats').innerHTML = `
+    <div class="stat-card"><div class="num">${totOrdini}</div><div class="lbl">Ordini totali</div></div>
+    <div class="stat-card"><div class="num">${fmtMoney(totFatturato)}</div><div class="lbl">Fatturato totale</div></div>
+    <div class="stat-card"><div class="num">${clientiAttivi}</div><div class="lbl">Clienti attivi</div></div>
+    <div class="stat-card"><div class="num">${state.vini.length}</div><div class="lbl">Referenze in catalogo</div></div>
+  `;
+  const tb1 = document.querySelector('#tbl-riordinare tbody');
+  tb1.innerHTML = (riordinare.data||[]).map(r=>`<tr><td>${esc(r.nome)}</td><td>${esc(r.produttore||'—')}</td><td>${r.quantita_disponibile}</td><td>${r.unita_vendute}</td></tr>`).join('') || '<tr><td colspan="4" class="meta">Nessun dato.</td></tr>';
+  const tb2 = document.querySelector('#tbl-riproporre tbody');
+  tb2.innerHTML = (riproporre.data||[]).map(r=>`<tr><td>${esc(r.nome)}</td><td>${esc(r.produttore||'—')}</td><td>${r.unita_vendute}</td><td>${fmtDate(r.ultima_vendita)}</td></tr>`).join('') || '<tr><td colspan="4" class="meta">Nessun dato.</td></tr>';
 }
-
-async function viewOrdineDetail(main, id){
-  const { data: ordine, error } = await sb.from('ordini').select('*, clienti(nome_locale,id)').eq('id', id).maybeSingle();
-  if(error || !ordine){ main.innerHTML = '<div class="empty">Ordine non trovato.</div>'; return; }
-  const { data: righe } = await sb.from('ordini_righe').select('*, vini(nome, produttore)').eq('ordine_id', id);
-  const canEdit = ordine.agente_id === state.user.id;
-  main.innerHTML = `
-  <h1 class="page-title">Ordine — ${esc(ordine.clienti?.nome_locale||'')} <span class="badge ${ordine.stato}">${ordine.stato}</span>
-    <a class="btn secondary small" href="#/ordini" style="margin-left:auto;">← Elenco</a>
-  </h1>
-  <div class="grid cols-2">
-    <div class="card">
-      <h3>Dettagli</h3>
-      <div class="row-items"><span class="muted">Cliente</span><span style="margin-left:auto;"><a href="#/clienti/${ordine.clienti?.id}">${esc(ordine.clienti?.nome_locale||'—')}</a></span></div>
-      <div class="row-items"><span class="muted">Agente</span><span style="margin-left:auto;">${esc(agenteName(ordine.agente_id))}</span></div>
-      <div class="row-items"><span class="muted">Data</span><span style="margin-left:auto;">${fmtDateTime(ordine.data_ordine)}</span></div>
-      <div class="row-items"><span class="muted">Totale</span><span style="margin-left:auto;"><b>${euro(ordine.totale)}</b></span></div>
-      ${ordine.note ? `<div style="margin-top:10px;"><span class="muted" style="font-size:12px;">Note</span><p style="margin:4px 0 0;">${esc(ordine.note)}</p></div>` : ''}
-    </div>
-    <div class="card">
-      <h3>Righe</h3>
-      ${righe && righe.length ? `<table><thead><tr><th>Vino</th><th>Qtà</th><th>Prezzo</th><th>Subtot.</th></tr></thead><tbody>
-        ${righe.map(r=>`<tr><td>${esc(r.vini?.nome||'—')}</td><td>${r.quantita}</td><td>${euro(r.prezzo_unitario)}</td><td>${euro(r.quantita*r.prezzo_unitario)}</td></tr>`).join('')}
-      </tbody></table>` : `<div class="empty">Nessuna riga.</div>`}
-    </div>
-  </div>
-  ${canEdit && ordine.stato==='bozza' ? `<div class="card" style="display:flex;gap:10px;">
-    <button class="btn" id="btn-conferma-ordine">Conferma ordine</button>
-    <button class="btn danger" id="btn-annulla-ordine">Annulla ordine</button>
-  </div>` : ''}`;
-
-  const btnConf = qs('#btn-conferma-ordine');
-  if(btnConf) btnConf.onclick = async ()=>{
-    const { error: e1 } = await sb.from('ordini').update({ stato:'confermato', updated_at:new Date().toISOString() }).eq('id', ordine.id);
-    if(e1) return toast('Errore: '+e1.message,'err');
-    for(const r of (righe||[])){
-      const { data: v } = await sb.from('vini').select('quantita_disponibile').eq('id', r.vino_id).maybeSingle();
-      if(v) await sb.from('vini').update({ quantita_disponibile: Math.max(0, v.quantita_disponibile - r.quantita) }).eq('id', r.vino_id);
-    }
-    toast('Ordine confermato','ok');
-    route();
-  };
-  const btnAnn = qs('#btn-annulla-ordine');
-  if(btnAnn) btnAnn.onclick = async ()=>{
-    if(!confirm('Annullare questo ordine?')) return;
-    const { error } = await sb.from('ordini').update({ stato:'annullato', updated_at:new Date().toISOString() }).eq('id', ordine.id);
-    if(error) return toast('Errore: '+error.message,'err');
-    toast('Ordine annullato','ok');
-    route();
-  };
-}
-
-/* ===================== ANALISI ===================== */
-async function viewAnalisi(main){
-  main.innerHTML = `<h1 class="page-title">Analisi vendite</h1>
-    <div class="section-tabs">
-      <button class="active" data-t="vino">Per referenza</button>
-      <button data-t="cliente">Per cliente</button>
-      <button data-t="riordinare">Da riordinare</button>
-      <button data-t="riproporre">Da riproporre</button>
-    </div>
-    <div class="card" id="an-wrap">Caricamento…</div>`;
-  const load = async (t)=>{
-    qsa('.section-tabs button').forEach(b=>b.classList.toggle('active', b.dataset.t===t));
-    let rows=[], cols=[];
-    if(t==='vino'){ const { data } = await sb.from('v_vendite_per_vino').select('*').order('unita_vendute',{ascending:false}); rows=data||[];
-      qs('#an-wrap').innerHTML = tableHtml(rows, ['nome','produttore','tipologia','quantita_disponibile','unita_vendute','ricavo_totale','ultima_vendita'],
-        { nome:'Vino', produttore:'Produttore', tipologia:'Tipo', quantita_disponibile:'Disp.', unita_vendute:'Unità vendute', ricavo_totale:'Ricavo', ultima_vendita:'Ultima vendita' },
-        { ricavo_totale: euro, ultima_vendita: fmtDate }); return; }
-    if(t==='cliente'){ const { data } = await sb.from('v_vendite_per_cliente').select('*').order('totale_speso',{ascending:false}); rows=data||[];
-      qs('#an-wrap').innerHTML = tableHtml(rows, ['nome_locale','numero_ordini','totale_speso','ultimo_ordine'],
-        { nome_locale:'Cliente', numero_ordini:'N. ordini', totale_speso:'Totale speso', ultimo_ordine:'Ultimo ordine' },
-        { totale_speso: euro, ultimo_ordine: fmtDate }); return; }
-    if(t==='riordinare'){ const { data } = await sb.from('v_da_riordinare').select('*'); rows=data||[];
-      qs('#an-wrap').innerHTML = tableHtml(rows, ['nome','produttore','quantita_disponibile','unita_vendute'],
-        { nome:'Vino', produttore:'Produttore', quantita_disponibile:'Disponibili', unita_vendute:'Unità vendute' }, {}); return; }
-    if(t==='riproporre'){ const { data } = await sb.from('v_da_riproporre').select('*'); rows=data||[];
-      qs('#an-wrap').innerHTML = tableHtml(rows, ['nome','produttore','unita_vendute','ultima_vendita'],
-        { nome:'Vino', produttore:'Produttore', unita_vendute:'Unità vendute', ultima_vendita:'Ultima vendita' }, { ultima_vendita: fmtDate }); return; }
-  };
-  qsa('.section-tabs button').forEach(b=> b.onclick = ()=>load(b.dataset.t));
-  load('vino');
-}
-function tableHtml(rows, cols, labels, formatters){
-  if(!rows.length) return `<div class="empty">Nessun dato disponibile.</div>`;
-  return `<table><thead><tr>${cols.map(c=>`<th>${labels[c]||c}</th>`).join('')}</tr></thead><tbody>
-    ${rows.map(r=>`<tr>${cols.map(c=>`<td>${esc(formatters[c] ? formatters[c](r[c]) : (r[c]==null?'—':r[c]))}</td>`).join('')}</tr>`).join('')}
-  </tbody></table>`;
-}
-
-/* ===================== ROUTE OVERRIDE for /clienti/:id/modifica ===================== */
-async function routeFull(){
-  const hash = location.hash.replace(/^#\/?/, '').split('?')[0];
-  const parts = hash.split('/');
-  const main = document.getElementById('main');
-  main.innerHTML = '<div class="empty">Caricamento…</div>';
-  markActive(parts[0] || 'dashboard');
-  try{
-    if(!parts[0] || parts[0]==='dashboard') await viewDashboard(main);
-    else if(parts[0]==='clienti' && !parts[1]) await viewClientiList(main);
-    else if(parts[0]==='clienti' && parts[1]==='nuovo') await viewClienteForm(main, null);
-    else if(parts[0]==='clienti' && parts[1] && parts[2]==='modifica'){
-      const { data: c } = await sb.from('clienti').select('*').eq('id', parts[1]).maybeSingle();
-      if(!c){ main.innerHTML = '<div class="empty">Cliente non trovato.</div>'; return; }
-      await viewClienteForm(main, c);
-    }
-    else if(parts[0]==='clienti' && parts[1]) await viewClienteDetail(main, parts[1]);
-    else if(parts[0]==='catalogo') await viewCatalogo(main);
-    else if(parts[0]==='ordini' && parts[1]==='nuovo') await viewOrdineForm(main);
-    else if(parts[0]==='ordini' && parts[1]) await viewOrdineDetail(main, parts[1]);
-    else if(parts[0]==='ordini') await viewOrdiniList(main);
-    else if(parts[0]==='analisi') await viewAnalisi(main);
-    else main.innerHTML = '<div class="empty">Pagina non trovata</div>';
-  }catch(e){
-    console.error(e);
-    main.innerHTML = `<div class="empty">Errore nel caricamento della pagina.<br><small>${esc(e.message||e)}</small></div>`;
-  }
-}
-route = routeFull;
-window.removeEventListener('hashchange', route);
-window.addEventListener('hashchange', routeFull);
-
-/* ===================== INIT ===================== */
-initAuth();
 </script>
 </body>
 </html>
