@@ -1,0 +1,941 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1">
+<title>CRM Wine Alchemist</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<style>
+:root{
+  --bg:#f5f5f7; --card:#ffffff; --text:#1d1d1f; --muted:#6e6e73;
+  --accent:#0071e3; --accent-dark:#005bb5; --danger:#ff3b30; --success:#34c759; --warn:#ff9f0a;
+  --border:#e5e5ea; --radius:14px; --shadow:0 1px 3px rgba(0,0,0,.08),0 1px 2px rgba(0,0,0,.06);
+}
+*{box-sizing:border-box;}
+html,body{margin:0;padding:0;height:100%;}
+body{
+  background:var(--bg); color:var(--text);
+  font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  -webkit-font-smoothing:antialiased;
+}
+a{color:inherit;text-decoration:none;}
+button{font-family:inherit;}
+input,select,textarea{font-family:inherit;font-size:15px;}
+
+/* ---------- Layout ---------- */
+#app{min-height:100vh;display:flex;flex-direction:column;}
+.topbar{
+  position:sticky;top:0;z-index:50;background:rgba(255,255,255,.85);backdrop-filter:blur(20px);
+  border-bottom:1px solid var(--border); display:flex;align-items:center;justify-content:space-between;
+  padding:12px 20px;
+}
+.topbar .brand{font-weight:700;font-size:17px;display:flex;align-items:center;gap:8px;}
+.topbar .brand .dot{width:9px;height:9px;border-radius:50%;background:var(--accent);}
+.topbar .user{display:flex;align-items:center;gap:12px;font-size:14px;color:var(--muted);}
+.topbar .user button{
+  background:none;border:1px solid var(--border);border-radius:20px;padding:6px 14px;color:var(--text);cursor:pointer;
+}
+.topbar .user button:hover{background:var(--bg);}
+
+.shell{display:flex;flex:1;width:100%;max-width:1200px;margin:0 auto;}
+.sidebar{
+  width:220px;flex-shrink:0;padding:20px 12px;display:flex;flex-direction:column;gap:2px;
+}
+.sidebar a{
+  display:flex;align-items:center;gap:10px;padding:10px 14px;border-radius:10px;color:var(--muted);
+  font-size:14.5px;font-weight:500;
+}
+.sidebar a.active{background:var(--accent);color:#fff;}
+.sidebar a:not(.active):hover{background:#eceef0;}
+main{flex:1;padding:24px 24px 90px;min-width:0;}
+
+.tabbar{
+  display:none;position:fixed;bottom:0;left:0;right:0;background:rgba(255,255,255,.92);backdrop-filter:blur(20px);
+  border-top:1px solid var(--border);justify-content:space-around;padding:6px 0 max(6px,env(safe-area-inset-bottom));z-index:50;
+}
+.tabbar a{display:flex;flex-direction:column;align-items:center;gap:2px;color:var(--muted);font-size:10.5px;padding:4px 8px;}
+.tabbar a.active{color:var(--accent);}
+.tabbar .ic{font-size:20px;line-height:1;}
+
+@media (max-width:860px){
+  .sidebar{display:none;}
+  .tabbar{display:flex;}
+  main{padding:16px 14px 90px;}
+}
+
+/* ---------- Components ---------- */
+.card{background:var(--card);border-radius:var(--radius);box-shadow:var(--shadow);padding:20px;margin-bottom:16px;}
+.card h3{margin:0 0 14px;font-size:16px;}
+.grid{display:grid;gap:16px;}
+.grid.cols-2{grid-template-columns:1fr 1fr;}
+.grid.cols-3{grid-template-columns:repeat(3,1fr);}
+.grid.cols-4{grid-template-columns:repeat(4,1fr);}
+@media (max-width:700px){.grid.cols-2,.grid.cols-3,.grid.cols-4{grid-template-columns:1fr 1fr;}}
+
+.stat{background:var(--card);border-radius:var(--radius);box-shadow:var(--shadow);padding:18px;}
+.stat .num{font-size:26px;font-weight:700;}
+.stat .label{color:var(--muted);font-size:12.5px;margin-top:2px;}
+
+h1.page-title{font-size:24px;margin:0 0 18px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;}
+h1.page-title small{font-size:13px;color:var(--muted);font-weight:400;}
+
+.btn{
+  display:inline-flex;align-items:center;justify-content:center;gap:6px;background:var(--accent);color:#fff;border:none;
+  border-radius:10px;padding:10px 18px;font-size:14.5px;font-weight:600;cursor:pointer;transition:background .15s;
+}
+.btn:hover{background:var(--accent-dark);}
+.btn.secondary{background:var(--bg);color:var(--text);border:1px solid var(--border);}
+.btn.secondary:hover{background:#e9e9eb;}
+.btn.danger{background:var(--danger);}
+.btn.small{padding:6px 12px;font-size:13px;border-radius:8px;}
+.btn:disabled{opacity:.5;cursor:not-allowed;}
+
+.field{margin-bottom:14px;}
+.field label{display:block;font-size:12.5px;color:var(--muted);margin-bottom:5px;font-weight:500;}
+.field input,.field select,.field textarea{
+  width:100%;padding:10px 12px;border:1px solid var(--border);border-radius:10px;background:#fff;color:var(--text);
+}
+.field input:focus,.field select:focus,.field textarea:focus{outline:2px solid var(--accent);outline-offset:-1px;}
+.field textarea{resize:vertical;min-height:70px;}
+
+table{width:100%;border-collapse:collapse;font-size:14px;}
+th{text-align:left;color:var(--muted);font-weight:600;font-size:12px;text-transform:uppercase;letter-spacing:.03em;padding:8px 10px;border-bottom:1px solid var(--border);}
+td{padding:10px;border-bottom:1px solid #f0f0f2;}
+tr:last-child td{border-bottom:none;}
+tr.clickable{cursor:pointer;}
+tr.clickable:hover{background:#f8f8fa;}
+
+.badge{display:inline-block;padding:3px 10px;border-radius:20px;font-size:11.5px;font-weight:600;}
+.badge.bozza{background:#fff2e0;color:#b26a00;}
+.badge.confermato{background:#e3f8e9;color:#1c7c3c;}
+.badge.annullato{background:#fdeaea;color:#c62828;}
+.badge.attivo{background:#e3f8e9;color:#1c7c3c;}
+.badge.sospeso{background:#f0f0f2;color:#6e6e73;}
+
+.searchbar{display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap;}
+.searchbar input,.searchbar select{padding:10px 12px;border:1px solid var(--border);border-radius:10px;flex:1;min-width:140px;}
+
+.empty{text-align:center;padding:50px 20px;color:var(--muted);}
+.empty .ic{font-size:36px;margin-bottom:8px;}
+
+.toast-wrap{position:fixed;top:16px;right:16px;z-index:200;display:flex;flex-direction:column;gap:8px;}
+.toast{background:#1d1d1f;color:#fff;padding:12px 18px;border-radius:10px;font-size:13.5px;box-shadow:var(--shadow);animation:fade .2s;max-width:320px;}
+.toast.err{background:var(--danger);}
+.toast.ok{background:#1c7c3c;}
+@keyframes fade{from{opacity:0;transform:translateY(-6px);}to{opacity:1;transform:translateY(0);}}
+
+.map-box{height:260px;border-radius:12px;overflow:hidden;border:1px solid var(--border);}
+#login-screen{min-height:100vh;display:flex;align-items:center;justify-content:center;background:linear-gradient(160deg,#f5f5f7,#e9edf3);padding:20px;}
+.login-card{background:#fff;border-radius:20px;box-shadow:0 10px 40px rgba(0,0,0,.12);padding:36px;width:100%;max-width:380px;}
+.login-card h1{font-size:22px;margin:0 0 4px;text-align:center;}
+.login-card p.sub{text-align:center;color:var(--muted);font-size:13.5px;margin:0 0 26px;}
+.login-tabs{display:flex;background:var(--bg);border-radius:10px;padding:3px;margin-bottom:20px;}
+.login-tabs button{flex:1;padding:8px;border:none;background:none;border-radius:8px;font-size:13.5px;font-weight:600;color:var(--muted);cursor:pointer;}
+.login-tabs button.active{background:#fff;color:var(--text);box-shadow:0 1px 3px rgba(0,0,0,.15);}
+.hidden{display:none !important;}
+.spinner{width:16px;height:16px;border:2px solid rgba(255,255,255,.4);border-top-color:#fff;border-radius:50%;animation:spin .7s linear infinite;display:inline-block;}
+@keyframes spin{to{transform:rotate(360deg);}}
+.link-btn{background:none;border:none;color:var(--accent);cursor:pointer;font-size:13px;padding:0;}
+.row-items{display:flex;gap:8px;align-items:center;padding:8px 0;border-bottom:1px solid #f0f0f2;}
+.row-items:last-child{border-bottom:none;}
+.muted{color:var(--muted);}
+.kpi-row{display:flex;gap:16px;flex-wrap:wrap;margin-bottom:20px;}
+.kpi-row .stat{flex:1;min-width:130px;}
+.section-tabs{display:flex;gap:4px;margin-bottom:18px;border-bottom:1px solid var(--border);}
+.section-tabs button{background:none;border:none;padding:10px 4px;margin-right:18px;font-size:14px;color:var(--muted);cursor:pointer;border-bottom:2px solid transparent;font-weight:500;}
+.section-tabs button.active{color:var(--accent);border-bottom-color:var(--accent);}
+</style>
+</head>
+<body>
+<div id="login-screen" class="hidden">
+  <div class="login-card">
+    <h1>🍷 Wine Alchemist</h1>
+    <p class="sub">CRM vendita — accesso agenti</p>
+    <div class="login-tabs">
+      <button id="tab-login" class="active">Accedi</button>
+      <button id="tab-signup">Registrati</button>
+    </div>
+    <div id="login-form">
+      <div class="field"><label>Email</label><input type="email" id="li-email" autocomplete="username"></div>
+      <div class="field"><label>Password</label><input type="password" id="li-pass" autocomplete="current-password"></div>
+      <button class="btn" id="btn-login" style="width:100%;">Accedi</button>
+      <div style="text-align:center;margin-top:14px;"><button class="link-btn" id="btn-forgot">Password dimenticata?</button></div>
+    </div>
+    <div id="signup-form" class="hidden">
+      <div class="field"><label>Nome e cognome</label><input type="text" id="su-nome"></div>
+      <div class="field"><label>Email</label><input type="email" id="su-email"></div>
+      <div class="field"><label>Password</label><input type="password" id="su-pass"></div>
+      <button class="btn" id="btn-signup" style="width:100%;">Crea account</button>
+    </div>
+    <div id="reset-form" class="hidden">
+      <div class="field"><label>Email</label><input type="email" id="rs-email"></div>
+      <button class="btn" id="btn-reset" style="width:100%;">Invia link di reset</button>
+      <div style="text-align:center;margin-top:14px;"><button class="link-btn" id="btn-back-login">Torna al login</button></div>
+    </div>
+    <div id="login-msg" style="margin-top:14px;font-size:13px;text-align:center;"></div>
+  </div>
+</div>
+
+<div id="app" class="hidden">
+  <div class="topbar">
+    <div class="brand"><span class="dot"></span> Wine Alchemist CRM</div>
+    <div class="user">
+      <span id="user-name"></span>
+      <button id="btn-logout">Esci</button>
+    </div>
+  </div>
+  <div class="shell">
+    <nav class="sidebar" id="sidebar"></nav>
+    <main id="main"></main>
+  </div>
+  <nav class="tabbar" id="tabbar"></nav>
+</div>
+
+<div class="toast-wrap" id="toasts"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+/* ===================== CONFIG ===================== */
+const SUPABASE_URL = 'https://xnzqutbfmaofvsurmkxf.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhuenF1dGJmbWFvZnZzdXJta3hmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODk3MjcxNzUsImV4cCI6MjEwNTMwMzE3NX0.mUJ5g-6QNLTnk5hCfHPjwTN45unJauaZOg2Pg_AIkkA';
+const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY, { auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true } });
+
+const NAV = [
+  { path:'dashboard', label:'Dashboard', ic:'🏠' },
+  { path:'clienti', label:'Clienti', ic:'🏛️' },
+  { path:'catalogo', label:'Catalogo', ic:'🍾' },
+  { path:'ordini', label:'Ordini', ic:'📋' },
+  { path:'analisi', label:'Analisi', ic:'📈' },
+];
+
+let state = { user:null, agente:null, agentiById:{}, clienti:[], vini:[] };
+
+/* ===================== UTIL ===================== */
+function toast(msg, type=''){
+  const el = document.createElement('div');
+  el.className = 'toast' + (type ? ' '+type : '');
+  el.textContent = msg;
+  document.getElementById('toasts').appendChild(el);
+  setTimeout(()=>el.remove(), 4200);
+}
+function euro(n){ return (Number(n)||0).toLocaleString('it-IT',{style:'currency',currency:'EUR'}); }
+function fmtDate(d){ if(!d) return '—'; return new Date(d).toLocaleDateString('it-IT',{day:'2-digit',month:'short',year:'numeric'}); }
+function fmtDateTime(d){ if(!d) return '—'; return new Date(d).toLocaleString('it-IT',{day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'}); }
+function esc(s){ return (s==null?'':String(s)).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function debounce(fn, ms){ let t; return (...a)=>{ clearTimeout(t); t=setTimeout(()=>fn(...a), ms); }; }
+function qs(sel, root=document){ return root.querySelector(sel); }
+function qsa(sel, root=document){ return [...root.querySelectorAll(sel)]; }
+
+async function geocode(indirizzo){
+  if(!indirizzo || indirizzo.trim().length<4) return null;
+  try{
+    const url = `https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${encodeURIComponent(indirizzo)}`;
+    const res = await fetch(url, { headers:{ 'Accept':'application/json' } });
+    const data = await res.json();
+    if(data && data[0]) return { lat: parseFloat(data[0].lat), lng: parseFloat(data[0].lon) };
+  }catch(e){ console.warn('geocode fallito', e); }
+  return null;
+}
+
+function genDescrizioneAuto(nome, tipo){
+  const tipi = { 'ristorante':'un ristorante', 'trattoria':'una trattoria', 'enoteca':'un’enoteca', 'bar':'un wine bar', 'hotel':'una struttura ricettiva', 'pizzeria':'una pizzeria' };
+  const t = tipi[(tipo||'').toLowerCase()] || 'un locale';
+  return `${nome} è ${t} selezionato come potenziale cliente per la proposta di referenze Wine Alchemist. Descrizione generata automaticamente — da rifinire con i dettagli raccolti sul campo.`;
+}
+
+/* ===================== AUTH ===================== */
+async function initAuth(){
+  const { data:{ session } } = await sb.auth.getSession();
+  if(session) await onLogged(session.user);
+  else showLogin();
+
+  sb.auth.onAuthStateChange(async (event, session)=>{
+    if(event === 'PASSWORD_RECOVERY'){
+      showLogin();
+      toast('Imposta la nuova password, poi accedi.', 'ok');
+      showTab('reset');
+      return;
+    }
+    if(event === 'SIGNED_IN' && session){ await onLogged(session.user); }
+    if(event === 'SIGNED_OUT'){ showLogin(); }
+  });
+}
+
+async function onLogged(user){
+  state.user = user;
+  const { data:agente, error } = await sb.from('agenti').select('*').eq('id', user.id).maybeSingle();
+  if(error){ toast('Errore caricamento profilo agente','err'); }
+  state.agente = agente;
+  document.getElementById('login-screen').classList.add('hidden');
+  document.getElementById('app').classList.remove('hidden');
+  qs('#user-name').textContent = agente ? agente.nome : user.email;
+  await loadAgentiMap();
+  buildNav();
+  if(!location.hash || location.hash === '#/') location.hash = '#/dashboard';
+  else route();
+}
+
+function showLogin(){
+  document.getElementById('app').classList.add('hidden');
+  document.getElementById('login-screen').classList.remove('hidden');
+}
+
+function showTab(which){
+  qsa('#login-form,#signup-form,#reset-form').forEach(f=>f.classList.add('hidden'));
+  qsa('.login-tabs button').forEach(b=>b.classList.remove('active'));
+  if(which==='login'){ qs('#login-form').classList.remove('hidden'); qs('#tab-login').classList.add('active'); }
+  if(which==='signup'){ qs('#signup-form').classList.remove('hidden'); qs('#tab-signup').classList.add('active'); }
+  if(which==='reset'){ qs('#reset-form').classList.remove('hidden'); }
+  qs('#login-msg').textContent='';
+}
+qs('#tab-login').onclick = ()=>showTab('login');
+qs('#tab-signup').onclick = ()=>showTab('signup');
+qs('#btn-forgot').onclick = ()=>showTab('reset');
+qs('#btn-back-login').onclick = ()=>showTab('login');
+
+qs('#btn-login').onclick = async ()=>{
+  const email = qs('#li-email').value.trim(), pass = qs('#li-pass').value;
+  if(!email || !pass) return toast('Inserisci email e password','err');
+  const btn = qs('#btn-login'); btn.disabled=true; btn.innerHTML='<span class="spinner"></span>';
+  const { error } = await sb.auth.signInWithPassword({ email, password: pass });
+  btn.disabled=false; btn.textContent='Accedi';
+  if(error) qs('#login-msg').innerHTML = `<span style="color:var(--danger)">${esc(error.message)}</span>`;
+};
+
+qs('#btn-signup').onclick = async ()=>{
+  const nome = qs('#su-nome').value.trim(), email = qs('#su-email').value.trim(), pass = qs('#su-pass').value;
+  if(!nome || !email || !pass) return toast('Compila tutti i campi','err');
+  if(pass.length < 6) return toast('La password deve avere almeno 6 caratteri','err');
+  const btn = qs('#btn-signup'); btn.disabled=true; btn.innerHTML='<span class="spinner"></span>';
+  const { data, error } = await sb.auth.signUp({ email, password: pass, options:{ data:{ nome } } });
+  btn.disabled=false; btn.textContent='Crea account';
+  if(error) return qs('#login-msg').innerHTML = `<span style="color:var(--danger)">${esc(error.message)}</span>`;
+  if(!data.session){
+    qs('#login-msg').innerHTML = `<span style="color:var(--success)">Account creato. Controlla la tua email per confermare, poi accedi.</span>`;
+    showTab('login');
+  }
+};
+
+qs('#btn-reset').onclick = async ()=>{
+  const email = qs('#rs-email').value.trim();
+  if(!email) return toast('Inserisci la tua email','err');
+  const { error } = await sb.auth.resetPasswordForEmail(email, { redirectTo: location.origin + location.pathname });
+  if(error) toast(error.message, 'err');
+  else { toast('Email di reset inviata', 'ok'); showTab('login'); }
+};
+
+qs('#btn-logout').onclick = async ()=>{ await sb.auth.signOut(); location.hash=''; };
+
+/* ===================== NAV / ROUTER ===================== */
+function buildNav(){
+  const side = document.getElementById('sidebar');
+  const tab = document.getElementById('tabbar');
+  side.innerHTML = NAV.map(n=>`<a href="#/${n.path}" data-path="${n.path}"><span>${n.ic}</span> ${n.label}</a>`).join('');
+  tab.innerHTML = NAV.map(n=>`<a href="#/${n.path}" data-path="${n.path}"><span class="ic">${n.ic}</span>${n.label}</a>`).join('');
+}
+function markActive(section){
+  qsa('#sidebar a, #tabbar a').forEach(a=>a.classList.toggle('active', a.dataset.path===section));
+}
+
+window.addEventListener('hashchange', route);
+
+async function route(){
+  const hash = location.hash.replace(/^#\/?/, '');
+  const [section, id, sub] = hash.split('/');
+  const main = document.getElementById('main');
+  main.innerHTML = '<div class="empty">Caricamento…</div>';
+  markActive(section || 'dashboard');
+  try{
+    if(!section || section==='dashboard') await viewDashboard(main);
+    else if(section==='clienti' && !id) await viewClientiList(main);
+    else if(section==='clienti' && id==='nuovo') await viewClienteForm(main, null);
+    else if(section==='clienti' && id) await viewClienteDetail(main, id, sub);
+    else if(section==='catalogo') await viewCatalogo(main);
+    else if(section==='ordini' && id==='nuovo') await viewOrdineForm(main);
+    else if(section==='ordini' && id) await viewOrdineDetail(main, id);
+    else if(section==='ordini') await viewOrdiniList(main);
+    else if(section==='analisi') await viewAnalisi(main);
+    else main.innerHTML = '<div class="empty">Pagina non trovata</div>';
+  }catch(e){
+    console.error(e);
+    main.innerHTML = `<div class="empty">Errore nel caricamento della pagina.<br><small>${esc(e.message||e)}</small></div>`;
+  }
+}
+
+async function loadAgentiMap(){
+  const { data } = await sb.from('agenti').select('id,nome,email,attivo');
+  state.agentiById = {};
+  (data||[]).forEach(a=> state.agentiById[a.id] = a);
+}
+function agenteName(id){ return state.agentiById[id]?.nome || '—'; }
+
+/* ===================== DASHBOARD ===================== */
+async function viewDashboard(main){
+  const uid = state.user.id;
+  const [{ data: clienti }, { data: ordini }, { data: riordinare }, { data: riproporre }] = await Promise.all([
+    sb.from('clienti').select('id,agente_id,stato'),
+    sb.from('ordini').select('id,agente_id,totale,stato,data_ordine').order('data_ordine',{ascending:false}).limit(500),
+    sb.from('v_da_riordinare').select('*').limit(6),
+    sb.from('v_da_riproporre').select('*').limit(6),
+  ]);
+  const mieiClienti = (clienti||[]).filter(c=>c.agente_id===uid).length;
+  const now = new Date(); const meseCorrente = now.getMonth(), annoCorrente = now.getFullYear();
+  const ordiniMese = (ordini||[]).filter(o=>{ const d=new Date(o.data_ordine); return d.getMonth()===meseCorrente && d.getFullYear()===annoCorrente && o.stato!=='annullato'; });
+  const totaleMese = ordiniMese.reduce((s,o)=>s+Number(o.totale||0),0);
+  const mieiOrdiniMese = ordiniMese.filter(o=>o.agente_id===uid).length;
+  const ultimiOrdini = (ordini||[]).slice(0,6);
+
+  main.innerHTML = `
+  <h1 class="page-title">Ciao, ${esc(state.agente?.nome?.split(' ')[0] || '')} 👋 <small>${fmtDate(new Date())}</small></h1>
+  <div class="kpi-row">
+    <div class="stat"><div class="num">${mieiClienti}</div><div class="label">I tuoi clienti</div></div>
+    <div class="stat"><div class="num">${euro(totaleMese)}</div><div class="label">Fatturato rete — mese corrente</div></div>
+    <div class="stat"><div class="num">${mieiOrdiniMese}</div><div class="label">Tuoi ordini questo mese</div></div>
+    <div class="stat"><div class="num">${(clienti||[]).length}</div><div class="label">Clienti totali rete</div></div>
+  </div>
+  <div class="grid cols-2">
+    <div class="card">
+      <h3>Ordini recenti</h3>
+      ${ultimiOrdini.length ? `<table><thead><tr><th>Data</th><th>Agente</th><th>Stato</th><th>Totale</th></tr></thead><tbody>
+        ${ultimiOrdini.map(o=>`<tr class="clickable" onclick="location.hash='#/ordini/${o.id}'"><td>${fmtDate(o.data_ordine)}</td><td>${esc(agenteName(o.agente_id))}</td><td><span class="badge ${o.stato}">${o.stato}</span></td><td>${euro(o.totale)}</td></tr>`).join('')}
+        </tbody></table>` : `<div class="empty">Nessun ordine ancora.</div>`}
+      <div style="margin-top:14px;"><a class="btn small" href="#/ordini/nuovo">+ Nuovo ordine</a></div>
+    </div>
+    <div class="card">
+      <h3>💡 Da riproporre (60+ giorni)</h3>
+      ${(riproporre||[]).length ? `<div>${riproporre.map(v=>`<div class="row-items"><div style="flex:1;"><b>${esc(v.nome)}</b><br><span class="muted" style="font-size:12px;">${esc(v.produttore||'')}</span></div><span class="muted" style="font-size:12px;">${v.ultima_vendita? fmtDate(v.ultima_vendita):'mai venduto'}</span></div>`).join('')}</div>` : `<div class="empty">Niente da segnalare.</div>`}
+      <h3 style="margin-top:20px;">📦 Scorte basse (venduti, ≤6 pz)</h3>
+      ${(riordinare||[]).length ? `<div>${riordinare.map(v=>`<div class="row-items"><div style="flex:1;"><b>${esc(v.nome)}</b></div><span class="badge sospeso">${v.quantita_disponibile} pz</span></div>`).join('')}</div>` : `<div class="empty">Nessuna scorta critica.</div>`}
+    </div>
+  </div>`;
+}
+
+/* ===================== CLIENTI ===================== */
+async function viewClientiList(main){
+  const { data, error } = await sb.from('clienti').select('*').order('nome_locale');
+  if(error) throw error;
+  state.clienti = data || [];
+  main.innerHTML = `
+  <h1 class="page-title">Clienti <small>${state.clienti.length} locali</small>
+    <a class="btn" href="#/clienti/nuovo">+ Nuovo cliente</a>
+  </h1>
+  <div class="searchbar">
+    <input type="text" id="cl-search" placeholder="Cerca per nome, città, sommelier...">
+    <select id="cl-filter-agente"><option value="">Tutti gli agenti</option>${Object.values(state.agentiById).map(a=>`<option value="${a.id}">${esc(a.nome)}</option>`).join('')}</select>
+    <select id="cl-filter-stato"><option value="">Tutti gli stati</option><option value="attivo">Attivo</option><option value="sospeso">Sospeso</option></select>
+    <button class="btn secondary small" id="cl-toggle-map">🗺️ Mappa</button>
+  </div>
+  <div id="cl-map-wrap" class="card hidden"><div class="map-box" id="cl-map"></div></div>
+  <div class="card" id="cl-table-wrap"></div>`;
+
+  const renderTable = ()=>{
+    const q = qs('#cl-search').value.trim().toLowerCase();
+    const agf = qs('#cl-filter-agente').value;
+    const stf = qs('#cl-filter-stato').value;
+    const rows = state.clienti.filter(c=>{
+      if(agf && c.agente_id!==agf) return false;
+      if(stf && c.stato!==stf) return false;
+      if(q){
+        const hay = [c.nome_locale,c.indirizzo,c.sommelier_nome,c.buyer_nome,c.tipo_locale].join(' ').toLowerCase();
+        if(!hay.includes(q)) return false;
+      }
+      return true;
+    });
+    qs('#cl-table-wrap').innerHTML = rows.length ? `<table><thead><tr><th>Locale</th><th>Tipo</th><th>Agente</th><th>Sommelier/Buyer</th><th>Stato</th></tr></thead><tbody>
+      ${rows.map(c=>`<tr class="clickable" onclick="location.hash='#/clienti/${c.id}'">
+        <td><b>${esc(c.nome_locale)}</b><br><span class="muted" style="font-size:12px;">${esc(c.indirizzo||'')}</span></td>
+        <td>${esc(c.tipo_locale||'—')}</td>
+        <td>${esc(agenteName(c.agente_id))}</td>
+        <td>${esc(c.sommelier_nome || c.buyer_nome || '—')}</td>
+        <td><span class="badge ${c.stato}">${esc(c.stato)}</span></td>
+      </tr>`).join('')}</tbody></table>` : `<div class="empty"><div class="ic">🔍</div>Nessun cliente trovato.</div>`;
+  };
+  renderTable();
+  qs('#cl-search').addEventListener('input', debounce(renderTable, 150));
+  qs('#cl-filter-agente').addEventListener('change', renderTable);
+  qs('#cl-filter-stato').addEventListener('change', renderTable);
+
+  let mapInited = false;
+  qs('#cl-toggle-map').onclick = ()=>{
+    const wrap = qs('#cl-map-wrap');
+    wrap.classList.toggle('hidden');
+    if(!wrap.classList.contains('hidden') && !mapInited){
+      mapInited = true;
+      const withCoords = state.clienti.filter(c=>c.lat && c.lng);
+      const map = L.map('cl-map').setView(withCoords[0] ? [withCoords[0].lat, withCoords[0].lng] : [45.4642, 9.19], 12);
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution:'&copy; OpenStreetMap' }).addTo(map);
+      withCoords.forEach(c=>{
+        L.marker([c.lat, c.lng]).addTo(map).bindPopup(`<b>${esc(c.nome_locale)}</b><br>${esc(c.indirizzo||'')}<br><a href="#/clienti/${c.id}">Apri scheda</a>`);
+      });
+      if(withCoords.length>1){ map.fitBounds(withCoords.map(c=>[c.lat,c.lng]), { padding:[30,30] }); }
+      setTimeout(()=>map.invalidateSize(), 200);
+    }
+  };
+}
+
+async function viewClienteForm(main, cliente){
+  const isEdit = !!cliente;
+  const canEdit = !isEdit || cliente.agente_id === state.user.id;
+  main.innerHTML = `
+  <h1 class="page-title">${isEdit? 'Modifica cliente':'Nuovo cliente'} <a class="btn secondary small" href="#/clienti${isEdit? '/'+cliente.id:''}">Annulla</a></h1>
+  <div class="card" style="max-width:640px;">
+    <div class="grid cols-2">
+      <div class="field"><label>Nome locale *</label><input id="f-nome" value="${esc(cliente?.nome_locale||'')}"></div>
+      <div class="field"><label>Tipo locale</label>
+        <select id="f-tipo">
+          ${['','Ristorante','Trattoria','Enoteca','Wine Bar','Hotel','Pizzeria','Altro'].map(t=>`<option ${cliente?.tipo_locale===t?'selected':''}>${t}</option>`).join('')}
+        </select>
+      </div>
+    </div>
+    <div class="field"><label>Indirizzo</label><input id="f-indirizzo" value="${esc(cliente?.indirizzo||'')}" placeholder="Via, civico, città"></div>
+    <div class="grid cols-2">
+      <div class="field"><label>Telefono</label><input id="f-tel" value="${esc(cliente?.telefono||'')}"></div>
+      <div class="field"><label>Email</label><input id="f-email" value="${esc(cliente?.email||'')}"></div>
+    </div>
+    <div class="grid cols-2">
+      <div class="field"><label>Sommelier — nome</label><input id="f-somm-nome" value="${esc(cliente?.sommelier_nome||'')}"></div>
+      <div class="field"><label>Sommelier — contatto</label><input id="f-somm-contatto" value="${esc(cliente?.sommelier_contatto||'')}"></div>
+    </div>
+    <div class="grid cols-2">
+      <div class="field"><label>Buyer — nome</label><input id="f-buyer-nome" value="${esc(cliente?.buyer_nome||'')}"></div>
+      <div class="field"><label>Buyer — contatto</label><input id="f-buyer-contatto" value="${esc(cliente?.buyer_contatto||'')}"></div>
+    </div>
+    <div class="field"><label>Stato</label>
+      <select id="f-stato"><option value="attivo" ${cliente?.stato==='attivo'?'selected':''}>Attivo</option><option value="sospeso" ${cliente?.stato==='sospeso'?'selected':''}>Sospeso</option></select>
+    </div>
+    <div class="field"><label>Descrizione automatica del locale</label>
+      <textarea id="f-descr">${esc(cliente?.descrizione_auto||'')}</textarea>
+      <button type="button" class="link-btn" id="btn-gen-descr" style="margin-top:6px;">✨ Genera automaticamente dal nome</button>
+    </div>
+    <div class="field"><label>Note</label><textarea id="f-note">${esc(cliente?.note||'')}</textarea></div>
+    <button class="btn" id="btn-save-cliente" ${!canEdit?'disabled':''}>${isEdit?'Salva modifiche':'Crea cliente'}</button>
+    ${!canEdit ? '<p class="muted" style="font-size:12.5px;margin-top:10px;">Questo cliente è gestito da un collega: non puoi modificarne i dati.</p>' : ''}
+  </div>`;
+
+  qs('#btn-gen-descr').onclick = ()=>{
+    const nome = qs('#f-nome').value.trim();
+    if(!nome) return toast('Inserisci prima il nome del locale','err');
+    qs('#f-descr').value = genDescrizioneAuto(nome, qs('#f-tipo').value);
+  };
+
+  qs('#btn-save-cliente').onclick = async ()=>{
+    const nome_locale = qs('#f-nome').value.trim();
+    if(!nome_locale) return toast('Il nome del locale è obbligatorio','err');
+    const btn = qs('#btn-save-cliente'); btn.disabled = true;
+    const indirizzo = qs('#f-indirizzo').value.trim();
+    let lat = cliente?.lat || null, lng = cliente?.lng || null;
+    const indirizzoCambiato = indirizzo && indirizzo !== (cliente?.indirizzo||'');
+    if(indirizzo && (indirizzoCambiato || !lat)){
+      const geo = await geocode(indirizzo);
+      if(geo){ lat = geo.lat; lng = geo.lng; }
+    }
+    const payload = {
+      nome_locale, tipo_locale: qs('#f-tipo').value || null, indirizzo: indirizzo || null,
+      lat, lng,
+      telefono: qs('#f-tel').value.trim() || null, email: qs('#f-email').value.trim() || null,
+      sommelier_nome: qs('#f-somm-nome').value.trim() || null, sommelier_contatto: qs('#f-somm-contatto').value.trim() || null,
+      buyer_nome: qs('#f-buyer-nome').value.trim() || null, buyer_contatto: qs('#f-buyer-contatto').value.trim() || null,
+      descrizione_auto: qs('#f-descr').value.trim() || null, note: qs('#f-note').value.trim() || null,
+      stato: qs('#f-stato').value, updated_at: new Date().toISOString(),
+    };
+    let res;
+    if(isEdit) res = await sb.from('clienti').update(payload).eq('id', cliente.id);
+    else res = await sb.from('clienti').insert({ ...payload, agente_id: state.user.id });
+    btn.disabled = false;
+    if(res.error) return toast('Errore salvataggio: '+res.error.message, 'err');
+    toast('Cliente salvato', 'ok');
+    location.hash = isEdit ? `#/clienti/${cliente.id}` : '#/clienti';
+  };
+}
+
+async function viewClienteDetail(main, id){
+  const { data: cliente, error } = await sb.from('clienti').select('*').eq('id', id).maybeSingle();
+  if(error || !cliente){ main.innerHTML = '<div class="empty">Cliente non trovato.</div>'; return; }
+  const canEdit = cliente.agente_id === state.user.id;
+  const { data: ordini } = await sb.from('ordini').select('*').eq('cliente_id', id).order('data_ordine',{ascending:false});
+  const { data: vstats } = await sb.from('v_vendite_per_cliente').select('*').eq('cliente_id', id).maybeSingle();
+
+  main.innerHTML = `
+  <h1 class="page-title">${esc(cliente.nome_locale)} <span class="badge ${cliente.stato}">${cliente.stato}</span>
+    <span style="margin-left:auto;display:flex;gap:8px;">
+      <a class="btn secondary small" href="#/clienti">← Elenco</a>
+      ${canEdit ? `<a class="btn small" href="#/clienti/${cliente.id}/modifica" id="edit-link">Modifica</a>` : ''}
+      <a class="btn small" href="#/ordini/nuovo?cliente=${cliente.id}">+ Nuovo ordine</a>
+    </span>
+  </h1>
+  <div class="grid cols-2">
+    <div class="card">
+      <h3>Anagrafica</h3>
+      <div class="row-items"><span class="muted">Tipo</span><span style="margin-left:auto;">${esc(cliente.tipo_locale||'—')}</span></div>
+      <div class="row-items"><span class="muted">Indirizzo</span><span style="margin-left:auto;">${esc(cliente.indirizzo||'—')}</span></div>
+      <div class="row-items"><span class="muted">Telefono</span><span style="margin-left:auto;">${esc(cliente.telefono||'—')}</span></div>
+      <div class="row-items"><span class="muted">Email</span><span style="margin-left:auto;">${esc(cliente.email||'—')}</span></div>
+      <div class="row-items"><span class="muted">Sommelier</span><span style="margin-left:auto;">${esc(cliente.sommelier_nome||'—')} ${cliente.sommelier_contatto?`(${esc(cliente.sommelier_contatto)})`:''}</span></div>
+      <div class="row-items"><span class="muted">Buyer</span><span style="margin-left:auto;">${esc(cliente.buyer_nome||'—')} ${cliente.buyer_contatto?`(${esc(cliente.buyer_contatto)})`:''}</span></div>
+      <div class="row-items"><span class="muted">Agente</span><span style="margin-left:auto;">${esc(agenteName(cliente.agente_id))}</span></div>
+      ${cliente.descrizione_auto ? `<div style="margin-top:12px;padding-top:12px;border-top:1px solid #f0f0f2;"><span class="muted" style="font-size:12px;">Descrizione</span><p style="margin:4px 0 0;">${esc(cliente.descrizione_auto)}</p></div>` : ''}
+      ${cliente.note ? `<div style="margin-top:12px;padding-top:12px;border-top:1px solid #f0f0f2;"><span class="muted" style="font-size:12px;">Note</span><p style="margin:4px 0 0;">${esc(cliente.note)}</p></div>` : ''}
+    </div>
+    <div class="card">
+      <h3>Posizione</h3>
+      ${cliente.lat && cliente.lng ? `<div class="map-box" id="one-map"></div>` : `<div class="empty">Indirizzo non geolocalizzato.</div>`}
+      <h3 style="margin-top:20px;">Riepilogo vendite</h3>
+      <div class="row-items"><span class="muted">Ordini totali</span><span style="margin-left:auto;"><b>${vstats?.numero_ordini||0}</b></span></div>
+      <div class="row-items"><span class="muted">Totale speso</span><span style="margin-left:auto;"><b>${euro(vstats?.totale_speso||0)}</b></span></div>
+      <div class="row-items"><span class="muted">Ultimo ordine</span><span style="margin-left:auto;">${fmtDate(vstats?.ultimo_ordine)}</span></div>
+    </div>
+  </div>
+  <div class="card">
+    <h3>Storico ordini</h3>
+    ${ordini && ordini.length ? `<table><thead><tr><th>Data</th><th>Agente</th><th>Stato</th><th>Totale</th></tr></thead><tbody>
+      ${ordini.map(o=>`<tr class="clickable" onclick="location.hash='#/ordini/${o.id}'"><td>${fmtDate(o.data_ordine)}</td><td>${esc(agenteName(o.agente_id))}</td><td><span class="badge ${o.stato}">${o.stato}</span></td><td>${euro(o.totale)}</td></tr>`).join('')}
+    </tbody></table>` : `<div class="empty">Nessun ordine per questo cliente.</div>`}
+  </div>`;
+
+  if(cliente.lat && cliente.lng){
+    const map = L.map('one-map', { zoomControl:true, scrollWheelZoom:false }).setView([cliente.lat, cliente.lng], 15);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution:'&copy; OpenStreetMap' }).addTo(map);
+    L.marker([cliente.lat, cliente.lng]).addTo(map);
+    setTimeout(()=>map.invalidateSize(), 150);
+  }
+  const editLink = qs('#edit-link');
+  if(editLink) editLink.onclick = (e)=>{ e.preventDefault(); openEditRoute(cliente); };
+}
+function openEditRoute(cliente){
+  history.replaceState(null,'','#/clienti/'+cliente.id+'/modifica');
+  viewClienteForm(document.getElementById('main'), cliente);
+}
+/* handle /clienti/:id/modifica via route() dispatch */
+const _origRoute = route;
+
+/* ===================== CATALOGO ===================== */
+async function viewCatalogo(main){
+  const { data, error } = await sb.from('vini').select('*').order('nome');
+  if(error) throw error;
+  state.vini = data || [];
+  main.innerHTML = `
+  <h1 class="page-title">Catalogo vini <small>${state.vini.length} referenze</small>
+    <button class="btn" id="btn-new-vino">+ Nuova referenza</button>
+  </h1>
+  <div class="searchbar">
+    <input type="text" id="v-search" placeholder="Cerca per nome, produttore, zona, codice...">
+    <select id="v-filter-tipo"><option value="">Tutte le tipologie</option></select>
+  </div>
+  <div class="card" id="v-table-wrap"></div>
+  <div id="vino-modal-root"></div>`;
+
+  const tipi = [...new Set(state.vini.map(v=>v.tipologia).filter(Boolean))].sort();
+  qs('#v-filter-tipo').innerHTML += tipi.map(t=>`<option>${esc(t)}</option>`).join('');
+
+  const renderTable = ()=>{
+    const q = qs('#v-search').value.trim().toLowerCase();
+    const tf = qs('#v-filter-tipo').value;
+    const rows = state.vini.filter(v=>{
+      if(tf && v.tipologia!==tf) return false;
+      if(q){ const hay=[v.nome,v.produttore,v.zona,v.referenza_codice].join(' ').toLowerCase(); if(!hay.includes(q)) return false; }
+      return true;
+    });
+    qs('#v-table-wrap').innerHTML = rows.length ? `<table><thead><tr><th>Referenza</th><th>Tipologia</th><th>Zona</th><th>Annata</th><th>Prezzo</th><th>Disponibili</th><th></th></tr></thead><tbody>
+      ${rows.map(v=>`<tr>
+        <td><b>${esc(v.nome)}</b><br><span class="muted" style="font-size:12px;">${esc(v.produttore||'')}${v.referenza_codice?' · '+esc(v.referenza_codice):''}</span></td>
+        <td>${esc(v.tipologia||'—')}</td><td>${esc(v.zona||'—')}</td><td>${v.annata||'—'}</td>
+        <td>${euro(v.prezzo_listino)}</td>
+        <td>${v.quantita_disponibile<=6? `<span class="badge sospeso">${v.quantita_disponibile}</span>` : v.quantita_disponibile}</td>
+        <td><button class="btn small secondary" onclick="openVinoModal('${v.id}')">Modifica</button></td>
+      </tr>`).join('')}</tbody></table>` : `<div class="empty"><div class="ic">🍇</div>Nessuna referenza trovata.</div>`;
+  };
+  renderTable();
+  qs('#v-search').addEventListener('input', debounce(renderTable,150));
+  qs('#v-filter-tipo').addEventListener('change', renderTable);
+  qs('#btn-new-vino').onclick = ()=>openVinoModal(null);
+  window.__renderCatalogo = renderTable;
+}
+
+function openVinoModal(id){
+  const vino = id ? state.vini.find(v=>v.id===id) : null;
+  const root = qs('#vino-modal-root');
+  root.innerHTML = `
+  <div style="position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:100;display:flex;align-items:center;justify-content:center;padding:16px;" id="vm-backdrop">
+    <div class="card" style="max-width:480px;width:100%;max-height:88vh;overflow:auto;">
+      <h3>${vino?'Modifica referenza':'Nuova referenza'}</h3>
+      <div class="grid cols-2">
+        <div class="field"><label>Nome *</label><input id="vm-nome" value="${esc(vino?.nome||'')}"></div>
+        <div class="field"><label>Produttore</label><input id="vm-prod" value="${esc(vino?.produttore||'')}"></div>
+      </div>
+      <div class="grid cols-3">
+        <div class="field"><label>Tipologia</label><input id="vm-tipo" value="${esc(vino?.tipologia||'')}" placeholder="Rosso, Bianco..."></div>
+        <div class="field"><label>Zona</label><input id="vm-zona" value="${esc(vino?.zona||'')}"></div>
+        <div class="field"><label>Annata</label><input id="vm-annata" type="number" value="${vino?.annata||''}"></div>
+      </div>
+      <div class="grid cols-3">
+        <div class="field"><label>Prezzo listino</label><input id="vm-prezzo" type="number" step="0.01" value="${vino?.prezzo_listino||''}"></div>
+        <div class="field"><label>Quantità disp.</label><input id="vm-qta" type="number" value="${vino?.quantita_disponibile??0}"></div>
+        <div class="field"><label>Codice</label><input id="vm-codice" value="${esc(vino?.referenza_codice||'')}"></div>
+      </div>
+      <div class="field"><label>Descrizione</label><textarea id="vm-descr">${esc(vino?.descrizione||'')}</textarea></div>
+      <div style="display:flex;gap:10px;justify-content:flex-end;">
+        <button class="btn secondary" id="vm-cancel">Annulla</button>
+        <button class="btn" id="vm-save">Salva</button>
+      </div>
+    </div>
+  </div>`;
+  qs('#vm-backdrop').onclick = (e)=>{ if(e.target.id==='vm-backdrop') root.innerHTML=''; };
+  qs('#vm-cancel').onclick = ()=> root.innerHTML='';
+  qs('#vm-save').onclick = async ()=>{
+    const nome = qs('#vm-nome').value.trim();
+    if(!nome) return toast('Il nome è obbligatorio','err');
+    const payload = {
+      nome, produttore: qs('#vm-prod').value.trim()||null, tipologia: qs('#vm-tipo').value.trim()||null,
+      zona: qs('#vm-zona').value.trim()||null, annata: qs('#vm-annata').value? Number(qs('#vm-annata').value):null,
+      prezzo_listino: qs('#vm-prezzo').value? Number(qs('#vm-prezzo').value):null,
+      quantita_disponibile: Number(qs('#vm-qta').value||0), referenza_codice: qs('#vm-codice').value.trim()||null,
+      descrizione: qs('#vm-descr').value.trim()||null, updated_at: new Date().toISOString(),
+    };
+    const res = vino ? await sb.from('vini').update(payload).eq('id', vino.id) : await sb.from('vini').insert(payload);
+    if(res.error) return toast('Errore: '+res.error.message,'err');
+    toast('Referenza salvata','ok');
+    root.innerHTML='';
+    await viewCatalogo(document.getElementById('main'));
+  };
+}
+
+/* ===================== ORDINI ===================== */
+async function viewOrdiniList(main){
+  const { data, error } = await sb.from('ordini').select('*, clienti(nome_locale)').order('data_ordine',{ascending:false});
+  if(error) throw error;
+  main.innerHTML = `
+  <h1 class="page-title">Ordini <small>${(data||[]).length} totali</small><a class="btn" href="#/ordini/nuovo">+ Nuovo ordine</a></h1>
+  <div class="searchbar">
+    <input type="text" id="o-search" placeholder="Cerca per cliente...">
+    <select id="o-filter-stato"><option value="">Tutti gli stati</option><option value="bozza">Bozza</option><option value="confermato">Confermato</option><option value="annullato">Annullato</option></select>
+    <select id="o-filter-agente"><option value="">Tutti gli agenti</option>${Object.values(state.agentiById).map(a=>`<option value="${a.id}">${esc(a.nome)}</option>`).join('')}</select>
+  </div>
+  <div class="card" id="o-table-wrap"></div>`;
+  const rowsAll = data||[];
+  const render = ()=>{
+    const q = qs('#o-search').value.trim().toLowerCase();
+    const sf = qs('#o-filter-stato').value;
+    const af = qs('#o-filter-agente').value;
+    const rows = rowsAll.filter(o=>{
+      if(sf && o.stato!==sf) return false;
+      if(af && o.agente_id!==af) return false;
+      if(q && !(o.clienti?.nome_locale||'').toLowerCase().includes(q)) return false;
+      return true;
+    });
+    qs('#o-table-wrap').innerHTML = rows.length ? `<table><thead><tr><th>Data</th><th>Cliente</th><th>Agente</th><th>Stato</th><th>Totale</th></tr></thead><tbody>
+      ${rows.map(o=>`<tr class="clickable" onclick="location.hash='#/ordini/${o.id}'"><td>${fmtDateTime(o.data_ordine)}</td><td>${esc(o.clienti?.nome_locale||'—')}</td><td>${esc(agenteName(o.agente_id))}</td><td><span class="badge ${o.stato}">${o.stato}</span></td><td>${euro(o.totale)}</td></tr>`).join('')}
+    </tbody></table>` : `<div class="empty">Nessun ordine trovato.</div>`;
+  };
+  render();
+  qs('#o-search').addEventListener('input', debounce(render,150));
+  qs('#o-filter-stato').addEventListener('change', render);
+  qs('#o-filter-agente').addEventListener('change', render);
+}
+
+async function viewOrdineForm(main){
+  const params = new URLSearchParams(location.hash.split('?')[1]||'');
+  const clientePreselect = params.get('cliente');
+  const [{ data: clienti }, { data: vini }] = await Promise.all([
+    sb.from('clienti').select('id,nome_locale').order('nome_locale'),
+    sb.from('vini').select('*').eq('attivo', true).order('nome'),
+  ]);
+  let righe = [];
+  main.innerHTML = `
+  <h1 class="page-title">Nuovo ordine <a class="btn secondary small" href="#/ordini">Annulla</a></h1>
+  <div class="card" style="max-width:760px;">
+    <div class="field"><label>Cliente *</label>
+      <select id="o-cliente">
+        <option value="">Seleziona cliente...</option>
+        ${(clienti||[]).map(c=>`<option value="${c.id}" ${c.id===clientePreselect?'selected':''}>${esc(c.nome_locale)}</option>`).join('')}
+      </select>
+    </div>
+    <div class="field"><label>Note</label><textarea id="o-note"></textarea></div>
+    <h3>Righe ordine</h3>
+    <div class="grid cols-3">
+      <div class="field" style="grid-column:span 2;"><label>Referenza</label>
+        <select id="o-vino-sel"><option value="">Seleziona vino...</option>${(vini||[]).map(v=>`<option value="${v.id}" data-prezzo="${v.prezzo_listino||0}" data-qta="${v.quantita_disponibile}">${esc(v.nome)}${v.produttore?' — '+esc(v.produttore):''} (disp. ${v.quantita_disponibile})</option>`).join('')}</select>
+      </div>
+      <div class="field"><label>Quantità</label><input type="number" id="o-vino-qta" min="1" value="1"></div>
+    </div>
+    <button class="btn secondary small" id="o-add-riga">+ Aggiungi al carrello</button>
+    <div id="o-righe-wrap" style="margin-top:16px;"></div>
+    <div style="text-align:right;font-size:18px;font-weight:700;margin-top:10px;">Totale: <span id="o-totale">€ 0,00</span></div>
+    <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:16px;">
+      <button class="btn secondary" id="o-save-bozza">Salva come bozza</button>
+      <button class="btn" id="o-save-confermato">Conferma ordine</button>
+    </div>
+  </div>`;
+
+  const renderRighe = ()=>{
+    qs('#o-righe-wrap').innerHTML = righe.length ? `<table><thead><tr><th>Vino</th><th>Qtà</th><th>Prezzo unit.</th><th>Subtot.</th><th></th></tr></thead><tbody>
+      ${righe.map((r,i)=>`<tr><td>${esc(r.nome)}</td><td>${r.quantita}</td><td>${euro(r.prezzo_unitario)}</td><td>${euro(r.quantita*r.prezzo_unitario)}</td><td><button class="link-btn" onclick="removeRiga(${i})">rimuovi</button></td></tr>`).join('')}
+    </tbody></table>` : `<div class="empty">Carrello vuoto.</div>`;
+    const tot = righe.reduce((s,r)=>s+r.quantita*r.prezzo_unitario,0);
+    qs('#o-totale').textContent = euro(tot);
+  };
+  window.removeRiga = (i)=>{ righe.splice(i,1); renderRighe(); };
+
+  qs('#o-add-riga').onclick = ()=>{
+    const sel = qs('#o-vino-sel');
+    const opt = sel.selectedOptions[0];
+    if(!sel.value) return toast('Seleziona un vino','err');
+    const qta = Number(qs('#o-vino-qta').value||1);
+    if(qta<1) return toast('Quantità non valida','err');
+    righe.push({ vino_id: sel.value, nome: opt.textContent, prezzo_unitario: Number(opt.dataset.prezzo||0), quantita: qta });
+    renderRighe();
+    sel.value=''; qs('#o-vino-qta').value=1;
+  };
+  renderRighe();
+
+  async function salva(stato){
+    const cliente_id = qs('#o-cliente').value;
+    if(!cliente_id) return toast('Seleziona un cliente','err');
+    if(!righe.length) return toast('Aggiungi almeno una referenza','err');
+    const totale = righe.reduce((s,r)=>s+r.quantita*r.prezzo_unitario,0);
+    const { data: ordine, error } = await sb.from('ordini').insert({
+      cliente_id, agente_id: state.user.id, stato, totale, note: qs('#o-note').value.trim()||null,
+    }).select().single();
+    if(error) return toast('Errore creazione ordine: '+error.message,'err');
+    const righeIns = righe.map(r=>({ ordine_id: ordine.id, vino_id: r.vino_id, quantita: r.quantita, prezzo_unitario: r.prezzo_unitario }));
+    const { error: err2 } = await sb.from('ordini_righe').insert(righeIns);
+    if(err2) return toast('Errore righe ordine: '+err2.message,'err');
+    if(stato==='confermato'){
+      for(const r of righe){
+        const v = (vini||[]).find(x=>x.id===r.vino_id);
+        if(v) await sb.from('vini').update({ quantita_disponibile: Math.max(0, v.quantita_disponibile - r.quantita) }).eq('id', v.id);
+      }
+    }
+    toast('Ordine salvato','ok');
+    location.hash = '#/ordini/'+ordine.id;
+  }
+  qs('#o-save-bozza').onclick = ()=>salva('bozza');
+  qs('#o-save-confermato').onclick = ()=>salva('confermato');
+}
+
+async function viewOrdineDetail(main, id){
+  const { data: ordine, error } = await sb.from('ordini').select('*, clienti(nome_locale,id)').eq('id', id).maybeSingle();
+  if(error || !ordine){ main.innerHTML = '<div class="empty">Ordine non trovato.</div>'; return; }
+  const { data: righe } = await sb.from('ordini_righe').select('*, vini(nome, produttore)').eq('ordine_id', id);
+  const canEdit = ordine.agente_id === state.user.id;
+  main.innerHTML = `
+  <h1 class="page-title">Ordine — ${esc(ordine.clienti?.nome_locale||'')} <span class="badge ${ordine.stato}">${ordine.stato}</span>
+    <a class="btn secondary small" href="#/ordini" style="margin-left:auto;">← Elenco</a>
+  </h1>
+  <div class="grid cols-2">
+    <div class="card">
+      <h3>Dettagli</h3>
+      <div class="row-items"><span class="muted">Cliente</span><span style="margin-left:auto;"><a href="#/clienti/${ordine.clienti?.id}">${esc(ordine.clienti?.nome_locale||'—')}</a></span></div>
+      <div class="row-items"><span class="muted">Agente</span><span style="margin-left:auto;">${esc(agenteName(ordine.agente_id))}</span></div>
+      <div class="row-items"><span class="muted">Data</span><span style="margin-left:auto;">${fmtDateTime(ordine.data_ordine)}</span></div>
+      <div class="row-items"><span class="muted">Totale</span><span style="margin-left:auto;"><b>${euro(ordine.totale)}</b></span></div>
+      ${ordine.note ? `<div style="margin-top:10px;"><span class="muted" style="font-size:12px;">Note</span><p style="margin:4px 0 0;">${esc(ordine.note)}</p></div>` : ''}
+    </div>
+    <div class="card">
+      <h3>Righe</h3>
+      ${righe && righe.length ? `<table><thead><tr><th>Vino</th><th>Qtà</th><th>Prezzo</th><th>Subtot.</th></tr></thead><tbody>
+        ${righe.map(r=>`<tr><td>${esc(r.vini?.nome||'—')}</td><td>${r.quantita}</td><td>${euro(r.prezzo_unitario)}</td><td>${euro(r.quantita*r.prezzo_unitario)}</td></tr>`).join('')}
+      </tbody></table>` : `<div class="empty">Nessuna riga.</div>`}
+    </div>
+  </div>
+  ${canEdit && ordine.stato==='bozza' ? `<div class="card" style="display:flex;gap:10px;">
+    <button class="btn" id="btn-conferma-ordine">Conferma ordine</button>
+    <button class="btn danger" id="btn-annulla-ordine">Annulla ordine</button>
+  </div>` : ''}`;
+
+  const btnConf = qs('#btn-conferma-ordine');
+  if(btnConf) btnConf.onclick = async ()=>{
+    const { error: e1 } = await sb.from('ordini').update({ stato:'confermato', updated_at:new Date().toISOString() }).eq('id', ordine.id);
+    if(e1) return toast('Errore: '+e1.message,'err');
+    for(const r of (righe||[])){
+      const { data: v } = await sb.from('vini').select('quantita_disponibile').eq('id', r.vino_id).maybeSingle();
+      if(v) await sb.from('vini').update({ quantita_disponibile: Math.max(0, v.quantita_disponibile - r.quantita) }).eq('id', r.vino_id);
+    }
+    toast('Ordine confermato','ok');
+    route();
+  };
+  const btnAnn = qs('#btn-annulla-ordine');
+  if(btnAnn) btnAnn.onclick = async ()=>{
+    if(!confirm('Annullare questo ordine?')) return;
+    const { error } = await sb.from('ordini').update({ stato:'annullato', updated_at:new Date().toISOString() }).eq('id', ordine.id);
+    if(error) return toast('Errore: '+error.message,'err');
+    toast('Ordine annullato','ok');
+    route();
+  };
+}
+
+/* ===================== ANALISI ===================== */
+async function viewAnalisi(main){
+  main.innerHTML = `<h1 class="page-title">Analisi vendite</h1>
+    <div class="section-tabs">
+      <button class="active" data-t="vino">Per referenza</button>
+      <button data-t="cliente">Per cliente</button>
+      <button data-t="riordinare">Da riordinare</button>
+      <button data-t="riproporre">Da riproporre</button>
+    </div>
+    <div class="card" id="an-wrap">Caricamento…</div>`;
+  const load = async (t)=>{
+    qsa('.section-tabs button').forEach(b=>b.classList.toggle('active', b.dataset.t===t));
+    let rows=[], cols=[];
+    if(t==='vino'){ const { data } = await sb.from('v_vendite_per_vino').select('*').order('unita_vendute',{ascending:false}); rows=data||[];
+      qs('#an-wrap').innerHTML = tableHtml(rows, ['nome','produttore','tipologia','quantita_disponibile','unita_vendute','ricavo_totale','ultima_vendita'],
+        { nome:'Vino', produttore:'Produttore', tipologia:'Tipo', quantita_disponibile:'Disp.', unita_vendute:'Unità vendute', ricavo_totale:'Ricavo', ultima_vendita:'Ultima vendita' },
+        { ricavo_totale: euro, ultima_vendita: fmtDate }); return; }
+    if(t==='cliente'){ const { data } = await sb.from('v_vendite_per_cliente').select('*').order('totale_speso',{ascending:false}); rows=data||[];
+      qs('#an-wrap').innerHTML = tableHtml(rows, ['nome_locale','numero_ordini','totale_speso','ultimo_ordine'],
+        { nome_locale:'Cliente', numero_ordini:'N. ordini', totale_speso:'Totale speso', ultimo_ordine:'Ultimo ordine' },
+        { totale_speso: euro, ultimo_ordine: fmtDate }); return; }
+    if(t==='riordinare'){ const { data } = await sb.from('v_da_riordinare').select('*'); rows=data||[];
+      qs('#an-wrap').innerHTML = tableHtml(rows, ['nome','produttore','quantita_disponibile','unita_vendute'],
+        { nome:'Vino', produttore:'Produttore', quantita_disponibile:'Disponibili', unita_vendute:'Unità vendute' }, {}); return; }
+    if(t==='riproporre'){ const { data } = await sb.from('v_da_riproporre').select('*'); rows=data||[];
+      qs('#an-wrap').innerHTML = tableHtml(rows, ['nome','produttore','unita_vendute','ultima_vendita'],
+        { nome:'Vino', produttore:'Produttore', unita_vendute:'Unità vendute', ultima_vendita:'Ultima vendita' }, { ultima_vendita: fmtDate }); return; }
+  };
+  qsa('.section-tabs button').forEach(b=> b.onclick = ()=>load(b.dataset.t));
+  load('vino');
+}
+function tableHtml(rows, cols, labels, formatters){
+  if(!rows.length) return `<div class="empty">Nessun dato disponibile.</div>`;
+  return `<table><thead><tr>${cols.map(c=>`<th>${labels[c]||c}</th>`).join('')}</tr></thead><tbody>
+    ${rows.map(r=>`<tr>${cols.map(c=>`<td>${esc(formatters[c] ? formatters[c](r[c]) : (r[c]==null?'—':r[c]))}</td>`).join('')}</tr>`).join('')}
+  </tbody></table>`;
+}
+
+/* ===================== ROUTE OVERRIDE for /clienti/:id/modifica ===================== */
+async function routeFull(){
+  const hash = location.hash.replace(/^#\/?/, '').split('?')[0];
+  const parts = hash.split('/');
+  const main = document.getElementById('main');
+  main.innerHTML = '<div class="empty">Caricamento…</div>';
+  markActive(parts[0] || 'dashboard');
+  try{
+    if(!parts[0] || parts[0]==='dashboard') await viewDashboard(main);
+    else if(parts[0]==='clienti' && !parts[1]) await viewClientiList(main);
+    else if(parts[0]==='clienti' && parts[1]==='nuovo') await viewClienteForm(main, null);
+    else if(parts[0]==='clienti' && parts[1] && parts[2]==='modifica'){
+      const { data: c } = await sb.from('clienti').select('*').eq('id', parts[1]).maybeSingle();
+      if(!c){ main.innerHTML = '<div class="empty">Cliente non trovato.</div>'; return; }
+      await viewClienteForm(main, c);
+    }
+    else if(parts[0]==='clienti' && parts[1]) await viewClienteDetail(main, parts[1]);
+    else if(parts[0]==='catalogo') await viewCatalogo(main);
+    else if(parts[0]==='ordini' && parts[1]==='nuovo') await viewOrdineForm(main);
+    else if(parts[0]==='ordini' && parts[1]) await viewOrdineDetail(main, parts[1]);
+    else if(parts[0]==='ordini') await viewOrdiniList(main);
+    else if(parts[0]==='analisi') await viewAnalisi(main);
+    else main.innerHTML = '<div class="empty">Pagina non trovata</div>';
+  }catch(e){
+    console.error(e);
+    main.innerHTML = `<div class="empty">Errore nel caricamento della pagina.<br><small>${esc(e.message||e)}</small></div>`;
+  }
+}
+route = routeFull;
+window.removeEventListener('hashchange', route);
+window.addEventListener('hashchange', routeFull);
+
+/* ===================== INIT ===================== */
+initAuth();
+</script>
+</body>
+</html>
