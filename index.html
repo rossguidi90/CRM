@@ -216,12 +216,36 @@ function openModal(html){
 }
 function closeModal(){ document.getElementById('modal-root').innerHTML=''; }
 
-// Descrizione automatica del locale a partire dal nome (euristica locale, nessuna chiamata esterna)
-function descrizioneAuto(nome, tipo){
-  const t = (tipo||'locale').toLowerCase();
+// Descrizione automatica del locale a partire dal nome (euristica locale, nessuna chiamata esterna: nessuna chiave API richiesta)
+function descrizioneAuto(nome, tipo, indirizzo){
   const n = (nome||'').trim();
   if(!n) return '';
-  return `${n} — ${t} selezionato per la proposta carta vini, potenziale cliente HoReCa in zona Milano.`;
+  const nl = n.toLowerCase();
+  let t = (tipo||'').trim().toLowerCase();
+  if(!t){
+    if(/enotec/.test(nl)) t = 'enoteca';
+    else if(/(hotel|resort)/.test(nl)) t = 'hotel';
+    else if(/(trattoria)/.test(nl)) t = 'trattoria';
+    else if(/(osteria)/.test(nl)) t = 'osteria';
+    else if(/(bar|bistrot|bistro)/.test(nl)) t = 'bar';
+    else t = 'ristorante';
+  }
+  const zona = indirizzo ? indirizzo.split(',').pop().trim() : '';
+  const cueStile = /(gourmet|stella|chef|fine)/.test(nl) ? 'a impostazione gourmet, target carta vini di livello alto'
+    : /(pizz)/.test(nl) ? 'pizzeria/ristorante informale, target vini d\'ingresso e bollicine facili'
+    : /(sushi|giappon|asian|wok|cine)/.test(nl) ? 'cucina orientale, target vini bianchi, bollicine e abbinamenti non convenzionali'
+    : 'target carta vini media, buon potenziale su rossi e bollicine';
+  return `${n} — ${t}${zona ? ' in zona '+zona : ''}, ${cueStile}. Descrizione generata automaticamente dal nome, da verificare e integrare al primo contatto.`;
+}
+
+async function uploadImmagine(file, bucket){
+  if(!file) return null;
+  const ext = file.name.split('.').pop();
+  const path = `${crypto.randomUUID()}.${ext}`;
+  const { error } = await sb.storage.from(bucket).upload(path, file, { upsert: false });
+  if(error){ toast('Errore upload immagine: '+error.message); return null; }
+  const { data } = sb.storage.from(bucket).getPublicUrl(path);
+  return data.publicUrl;
 }
 
 /* ================= AUTH ================= */
@@ -350,6 +374,9 @@ function openClienteForm(cliente){
     <h2>${cliente ? 'Modifica cliente' : 'Nuovo cliente'}</h2>
     <form id="cliente-form">
       <div class="form-row full"><div><label>Nome locale *</label><input required id="f-nome" value="${esc(c.nome_locale)}"></div></div>
+      <div class="form-row full"><div><label>Foto locale</label><input type="file" accept="image/*" id="f-immagine">
+        ${c.immagine_url ? `<img src="${esc(c.immagine_url)}" style="max-width:100%;border-radius:10px;margin-top:8px">` : ''}
+      </div></div>
       <div class="form-row">
         <div><label>Tipo locale</label><input id="f-tipo" placeholder="ristorante, enoteca, hotel..." value="${esc(c.tipo_locale)}"></div>
         <div><label>Stato</label>
@@ -377,11 +404,27 @@ function openClienteForm(cliente){
       </div>
       <div class="form-row full"><div><label>Note</label><textarea id="f-note" rows="2">${esc(c.note)}</textarea></div></div>
       <div class="modal-actions">
+        ${cliente ? '<button type="button" class="btn-danger" id="c-delete">Elimina</button>' : ''}
         <button type="button" class="btn-secondary" onclick="closeModal()">Annulla</button>
         <button type="submit" class="btn-primary">Salva</button>
       </div>
     </form>
   `);
+  if(cliente){
+    document.getElementById('c-delete').addEventListener('click', async ()=>{
+      if(!confirm(`Eliminare definitivamente ${cliente.nome_locale}? L'operazione non è reversibile.`)) return;
+      const { error } = await sb.from('clienti').delete().eq('id', cliente.id);
+      if(error){
+        if(error.code === '23503' || /foreign key/i.test(error.message)){
+          toast('Il cliente ha ordini collegati: non può essere eliminato. Impostalo su "inattivo" invece.');
+        } else {
+          toast('Errore: '+error.message);
+        }
+        return;
+      }
+      closeModal(); toast('Cliente eliminato'); await loadClienti(); renderClienti();
+    });
+  }
   document.getElementById('cliente-form').addEventListener('submit', async (e)=>{
     e.preventDefault();
     const nome = document.getElementById('f-nome').value.trim();
@@ -399,13 +442,18 @@ function openClienteForm(cliente){
       buyer_nome: document.getElementById('f-buyer-nome').value.trim(),
       buyer_contatto: document.getElementById('f-buyer-contatto').value.trim(),
       note: document.getElementById('f-note').value.trim(),
-      descrizione_auto: descrizioneAuto(nome, tipo),
+      descrizione_auto: descrizioneAuto(nome, tipo, indirizzo),
     };
     if(indirizzo){
       try{
         const geo = await geocodeAddress(indirizzo);
         if(geo){ payload.lat = geo.lat; payload.lng = geo.lng; }
       }catch(_){}
+    }
+    const fileInput = document.getElementById('f-immagine');
+    if(fileInput.files[0]){
+      const url = await uploadImmagine(fileInput.files[0], 'locali-immagini');
+      if(url) payload.immagine_url = url;
     }
     let error;
     if(cliente?.id){
@@ -433,6 +481,7 @@ window.openClienteDetail = function(id){
   const ordiniCliente = state.ordini.filter(o=>o.cliente_id===id);
   openModal(`
     <h2>${esc(c.nome_locale)} <span class="badge ${c.stato}">${c.stato}</span></h2>
+    ${c.immagine_url ? `<img src="${esc(c.immagine_url)}" style="width:100%;max-height:180px;object-fit:cover;border-radius:10px;margin-bottom:10px">` : ''}
     <p class="meta">${esc(c.descrizione_auto || '')}</p>
     <div class="tag-title">Contatti</div>
     <div>${esc(c.indirizzo||'—')}<br>${esc(c.telefono||'')} ${c.email?('· '+esc(c.email)):''}</div>
@@ -471,6 +520,7 @@ function renderVini(){
   if(!list.length){ el.innerHTML = `<div class="empty-state">Nessuna referenza trovata.</div>`; return; }
   el.innerHTML = list.map(v=>`
     <div class="list-item" ${state.isAdmin ? `onclick="openVinoForm(${JSON.stringify(v).replace(/"/g,'&quot;')})"` : 'style="cursor:default"'}>
+      ${v.immagine_url ? `<img src="${esc(v.immagine_url)}" style="width:100%;height:100px;object-fit:cover;border-radius:8px;margin-bottom:8px">` : ''}
       <h3>${esc(v.nome)} ${v.annata?('· '+v.annata):''}</h3>
       <div class="meta">${esc(v.produttore||'—')} · ${esc(v.tipologia||'—')}</div>
       <div class="meta">${fmtMoney(v.prezzo_listino)} · disponibili: ${v.quantita_disponibile}</div>
@@ -486,6 +536,9 @@ window.openVinoForm = function(vino){
     <h2>${vino ? 'Modifica referenza' : 'Nuova referenza'}</h2>
     <form id="vino-form">
       <div class="form-row"><div><label>Nome *</label><input required id="v-nome" value="${esc(v.nome)}"></div><div><label>Annata</label><input type="number" id="v-annata" value="${v.annata||''}"></div></div>
+      <div class="form-row full"><div><label>Foto etichetta</label><input type="file" accept="image/*" id="v-immagine">
+        ${v.immagine_url ? `<img src="${esc(v.immagine_url)}" style="max-height:120px;border-radius:10px;margin-top:8px">` : ''}
+      </div></div>
       <div class="form-row"><div><label>Produttore</label><input id="v-produttore" value="${esc(v.produttore)}"></div><div><label>Zona</label><input id="v-zona" value="${esc(v.zona)}"></div></div>
       <div class="form-row"><div><label>Tipologia</label><input id="v-tipologia" placeholder="rosso, bianco, bolle..." value="${esc(v.tipologia)}"></div><div><label>Codice referenza</label><input id="v-codice" value="${esc(v.referenza_codice)}"></div></div>
       <div class="form-row"><div><label>Prezzo listino (€)</label><input type="number" step="0.01" id="v-prezzo" value="${v.prezzo_listino||''}"></div><div><label>Quantità disponibile</label><input type="number" id="v-qta" value="${v.quantita_disponibile??0}"></div></div>
@@ -518,6 +571,11 @@ window.openVinoForm = function(vino){
       quantita_disponibile: parseInt(document.getElementById('v-qta').value) || 0,
       descrizione: document.getElementById('v-desc').value.trim(),
     };
+    const vFileInput = document.getElementById('v-immagine');
+    if(vFileInput.files[0]){
+      const url = await uploadImmagine(vFileInput.files[0], 'vini-immagini');
+      if(url) payload.immagine_url = url;
+    }
     let error;
     if(vino?.id){ ({ error } = await sb.from('vini').update(payload).eq('id', vino.id)); }
     else { ({ error } = await sb.from('vini').insert(payload)); }
