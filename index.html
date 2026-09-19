@@ -104,6 +104,7 @@ th{color:var(--sub);font-weight:600;font-size:12px;text-transform:uppercase}
       <div class="err hidden" id="login-err"></div>
     </form>
     <div class="toggle-link" id="toggle-signup">Non hai un account? Registrati</div>
+    <div class="toggle-link" id="forgot-password">Password dimenticata?</div>
   </div>
 </div>
 
@@ -263,6 +264,13 @@ document.getElementById('logout-btn').addEventListener('click', async ()=>{
   await sb.auth.signOut();
 });
 
+document.getElementById('forgot-password').addEventListener('click', async ()=>{
+  const email = document.getElementById('login-email').value.trim();
+  if(!email){ toast('Inserisci prima la tua email nel campo sopra'); return; }
+  const { error } = await sb.auth.resetPasswordForEmail(email, { redirectTo: window.location.href });
+  toast(error ? 'Errore: '+error.message : 'Email di reset inviata, controlla la posta');
+});
+
 sb.auth.onAuthStateChange((event, session)=>{
   if(session){ boot(session); } else { showLogin(); }
 });
@@ -284,7 +292,9 @@ async function boot(session){
     agente = data;
   }
   state.agente = agente;
+  state.isAdmin = agente?.ruolo === 'admin';
   document.getElementById('agente-nome').textContent = agente?.nome || state.user.email;
+  document.getElementById('new-vino-btn').classList.toggle('hidden', !state.isAdmin);
 
   await Promise.all([loadClienti(), loadVini(), loadOrdini()]);
   renderClienti(); renderVini(); renderOrdini(); renderAnalisi();
@@ -460,7 +470,7 @@ function renderVini(){
   const el = document.getElementById('vini-list');
   if(!list.length){ el.innerHTML = `<div class="empty-state">Nessuna referenza trovata.</div>`; return; }
   el.innerHTML = list.map(v=>`
-    <div class="list-item" onclick="openVinoForm(${JSON.stringify(v).replace(/"/g,'&quot;')})">
+    <div class="list-item" ${state.isAdmin ? `onclick="openVinoForm(${JSON.stringify(v).replace(/"/g,'&quot;')})"` : 'style="cursor:default"'}>
       <h3>${esc(v.nome)} ${v.annata?('· '+v.annata):''}</h3>
       <div class="meta">${esc(v.produttore||'—')} · ${esc(v.tipologia||'—')}</div>
       <div class="meta">${fmtMoney(v.prezzo_listino)} · disponibili: ${v.quantita_disponibile}</div>
