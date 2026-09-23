@@ -821,7 +821,7 @@ addRoute('ordine', async (id, extra) => {
   const catalogo = (ws || []).filter(w => ST[w.id]?.vendibile);
   const items = new Map((rows || []).map(i => [i.wine_id, i]));
   const editabile = o.stato === 'bozza' && (isAdmin() || o.agent_id === S.me.id);
-  const passo = w => (w.formato_cl >= 150 || w.tipologia === 'accessorio' ? 1 : (CFG.cartone || 6));
+  const passo = () => 1; // singola bottiglia per click, sempre (nessun vincolo di cartone)
   const f = { q: '', tipo: '' };
 
   async function setQty(w, q) {
