@@ -310,6 +310,11 @@ a .row:active,button.row:active{background:var(--fill)}
 .sheet .tot{flex:1;min-width:0;text-align:left;background:none;border:0;padding:0}
 
 input[type=checkbox]{accent-color:#7A1F2B;width:20px;height:20px}
+/* ---- fuori zona ---- */
+.stamp{display:inline-block;margin:0 0 4px;padding:2px 8px;border:1.5px solid var(--red);border-radius:6px;color:var(--red);
+  font-size:10.5px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;transform:rotate(-2deg);background:color-mix(in srgb,var(--red) 8%,transparent)}
+.stamp.sm{font-size:9.5px;padding:1px 6px;margin-bottom:2px}
+.row.fz,.cart-item.fz{background-image:repeating-linear-gradient(135deg,color-mix(in srgb,var(--red) 7%,transparent) 0 8px,transparent 8px 16px)}
 /* ---- selettore tema ---- */
 .theme-btn{display:inline-flex;align-items:center;gap:6px}
 #side .theme-btn{margin:0 10px;justify-content:flex-start;border-color:rgba(255,255,255,.18)!important;color:#D8D8D2!important}
@@ -365,10 +370,10 @@ window.WA_CONFIG = {
   cartone: 6            // passo dello stepper quantità
 };
 </script>
-<script src="crm_map.js?v=6"></script>
+<script src="crm_map.js?v=7"></script>
 <script src="crm_insights.js?v=5"></script>
 <script src="crm_client_form.js?v=8"></script>
-<script src="crm.js?v=15"></script>
+<script src="crm.js?v=16"></script>
 <script>
 // Diagnostica: se dopo 9 secondi l'app non è partita, dice cosa manca invece di girare a vuoto.
 (function () {

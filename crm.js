@@ -748,6 +748,9 @@ addRoute('mappa', async () => {
       <button class="chip" data-miei>Solo i miei</button></div>
     <div style="position:relative;isolation:isolate;height:min(62vh,560px);min-height:320px;border-radius:var(--r);overflow:hidden">
       <div id="map"></div></div>
+    <div class="chips" style="margin-top:10px">${Object.values(S.agents).filter(x => x.attivo && x.ruolo !== 'viewer').map(x =>
+      `<span class="chip" style="cursor:default"><b style="display:inline-flex;width:18px;height:18px;border-radius:50%;align-items:center;justify-content:center;
+        background:${x.colore};color:#fff;font-size:10.5px;margin-right:6px">${esc(x.nome[0].toUpperCase())}</b>${esc(x.nome)}</span>`).join('')}</div>
     <div class="group hide" id="sel"></div>
     <div class="sub" id="cnt" style="padding:8px 4px"></div>`);
 
@@ -914,7 +917,7 @@ addRoute('catalogo', async () => {
           <span class="sub">${esc([w.formato_cl ? w.formato_cl + ' cl' : null, w.zona_produzione].filter(Boolean).join(' · '))}</span>
           ${w.no_sconto || !w.vendibile_milano || w.gestione_giacenza ? `<span class="tags" style="margin-top:4px">
             ${w.no_sconto ? '<span class="pill">No sconto</span>' : ''}
-            ${!w.vendibile_milano ? '<span class="pill perso">Fuori zona</span>' : ''}
+            ${!w.vendibile_milano ? `<span class="stamp">Fuori zona</span>` : ''}
             ${w.gestione_giacenza ? `<span class="pill">Giacenza ${s.disponibile ?? 0}</span>` : ''}</span>` : ''}
         </span>
         <span class="meta"><span class="mono" style="font-weight:600">${eur(w.prezzo_listino)}</span>
@@ -1118,13 +1121,15 @@ addRoute('ordine', async (id, extra) => {
   const [{ data: o, error }, { data: rows }, { data: ws }, { data: stock }] = await Promise.all([
     sb.from('orders').select('*').eq('id', id).single(),
     sb.from('order_items').select('*').eq('order_id', id),
-    sb.from('wines').select('*').eq('in_inventario', true).order('produttore'),
+    sb.from('wines').select('*').or('in_inventario.eq.true,vendibile_milano.eq.false').order('produttore'),
     sb.rpc('stock')
   ]);
   if (error) throw error;
   const cli = S.clients.find(c => c.id === o.client_id) || {};
   const ST = Object.fromEntries((stock || []).map(s => [s.wine_id, s]));
-  const catalogo = ordinaCat((ws || []).filter(w => ST[w.id]?.vendibile));
+  const fz = w => !w.vendibile_milano;
+  const catalogo = ordinaCat((ws || []).filter(w => ST[w.id]?.vendibile ||
+    (fz(w) && w.prezzo_listino != null && !['esaurito', 'in_arrivo'].includes(w.disponibilita))));
   const items = new Map((rows || []).map(i => [i.wine_id, i]));
   const editabile = o.stato === 'bozza' && (isAdmin() || o.agent_id === S.me.id);
   const boss = isAdmin() || isViewer();
@@ -1135,6 +1140,7 @@ addRoute('ordine', async (id, extra) => {
 
   async function setQty(w, q) {
     const it = items.get(w.id);
+    if (!it && q > 0 && fz(w)) toast(`⚠︎ Fuori zona: ${w.esclusiva || 'non vendibile su ' + CFG.zona}. Verifica prima di inviare.`, 5000);
     if (q <= 0 && it) {
       const r = await sb.from('order_items').delete().eq('id', it.id);
       if (r.error) throw r.error;
@@ -1185,9 +1191,11 @@ addRoute('ordine', async (id, extra) => {
     const it = items.get(w.id), q = it ? it.qty : 0, s = ST[w.id] || {};
     const disp = w.gestione_giacenza ? `Libere ${s.disponibile ?? 0}` : lbl(w.disponibilita);
     const tono = w.gestione_giacenza && s.disponibile <= 12 ? 'var(--orange)' : 'var(--fg2)';
-    return `<div class="row tp" style="--tp:${tcol(w.tipologia)};${q ? 'background:var(--accent-tint)' : ''}">
+    return `<div class="row tp${fz(w) ? ' fz' : ''}" style="--tp:${tcol(w.tipologia)};${q ? 'background:var(--accent-tint)' : ''}">
       <span style="flex:1;min-width:0">
+        ${fz(w) ? `<span class="stamp" title="${esc(w.esclusiva || '')}">Fuori zona</span>` : ''}
         ${nomeVino(w)}
+        ${fz(w) && w.esclusiva ? `<span class="sub" style="display:block;color:var(--red)">${esc(w.esclusiva)}</span>` : ''}
         <span class="sub">${esc([w.formato_cl ? w.formato_cl + ' cl' : null, w.zona_produzione].filter(Boolean).join(' · '))}</span><br>
         <span class="sub mono" style="font-weight:600">${eur(w.prezzo_listino)}
           <span style="color:${tono}">· ${esc(disp)}</span>
@@ -1205,10 +1213,10 @@ addRoute('ordine', async (id, extra) => {
     const lordo = num(it?.prezzo_unitario ?? w.prezzo_listino) * q, net = it ? netto(w, it) : 0;
     const bloccato = noSc(w) && !boss;
     const info = [sc ? `−${sc}%` : '', om ? `${om} omaggio` : ''].filter(Boolean).join(' · ');
-    return `<div class="cart-item tp" style="--tp:${tcol(w.tipologia)}">
+    return `<div class="cart-item tp${fz(w) ? ' fz' : ''}" style="--tp:${tcol(w.tipologia)}">
       <div class="cart-row">
         <span style="flex:1;min-width:0">
-          <span class="prod" style="font-size:11.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(w.produttore || '')}</span>
+          ${fz(w) ? '<span class="stamp sm">Fuori zona</span>' : ''}<span class="prod" style="font-size:11.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(w.produttore || '')}</span>
           <span class="ttl" style="font-size:14px;display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(w.nome)}${w.annata ? ' ' + esc(w.annata) : ''}</span>
           <span class="sub mono">${net < lordo - 0.004 ? `<s>${eur(lordo)}</s> ` : ''}<b>${eur(net)}</b>${info ? ` <span style="color:var(--green)">${info}</span>` : ''}</span></span>
         ${editabile ? `<span class="step">
@@ -1402,6 +1410,10 @@ addRoute('ordine', async (id, extra) => {
       location.hash = '#/ordini';
     }));
     document.querySelectorAll('[data-go]').forEach(b => b.addEventListener('click', () => go(async () => {
+      const fuori = scelti.filter(fz);
+      if (b.dataset.go === 'inviato' && fuori.length &&
+          !confirm(`Attenzione: l'ordine contiene ${fuori.length} referenz${fuori.length === 1 ? 'a' : 'e'} fuori zona:\n\n` +
+            fuori.map(w => `• ${w.produttore} · ${w.nome}${w.esclusiva ? ' (' + w.esclusiva + ')' : ''}`).join('\n') + '\n\nInviare comunque?')) return;
       b.disabled = true;
       try {
         const r = await sb.from('orders').update({ stato: b.dataset.go }).eq('id', o.id).select().single();

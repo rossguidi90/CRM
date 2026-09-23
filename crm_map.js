@@ -16,8 +16,9 @@ const CrmMap = (() => {
 
   document.head.insertAdjacentHTML('beforeend', `<style>
     .leaflet-tile-pane{filter:grayscale(1) contrast(.92) brightness(1.04)}
-    .crm-pin{display:block;width:22px;height:22px;border-radius:50%;background:var(--c);
-      border:3px solid var(--r);box-shadow:0 1px 5px rgb(0 0 0/.35)}
+    .crm-pin{display:flex;align-items:center;justify-content:center;width:26px;height:26px;border-radius:50%;background:var(--c);
+      border:2.5px solid #fff;box-shadow:0 0 0 2px var(--r),0 2px 6px rgb(0 0 0/.35);
+      color:#fff;font:800 12px/1 -apple-system,system-ui,sans-serif;text-shadow:0 1px 2px rgb(0 0 0/.45)}
     .leaflet-popup-content-wrapper{border-radius:14px;font:14px/1.35 -apple-system,system-ui,sans-serif}
   </style>`);
 
@@ -76,8 +77,8 @@ const CrmMap = (() => {
       const a = agentsById[c.agent_id] ?? {};
       const editable = opts.isAdmin || c.agent_id === opts.meId;
       const icon = L.divIcon({
-        className: '', iconSize: [22, 22], iconAnchor: [11, 11],
-        html: `<span class="crm-pin" style="--c:${STATUS[c.stato]};--r:${a.colore ?? '#fff'}"></span>`
+        className: '', iconSize: [26, 26], iconAnchor: [13, 13],
+        html: `<span class="crm-pin" style="--c:${STATUS[c.stato]};--r:${a.colore ?? '#fff'}">${esc((a.nome || '?')[0].toUpperCase())}</span>`
       });
       const m = L.marker([c.lat, c.lng], { icon, draggable: editable, title: c.insegna || c.ragione_sociale })
         .bindPopup(`<b>${esc(c.insegna || c.ragione_sociale)}</b><br>${esc(c.indirizzo)}
