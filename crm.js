@@ -10,6 +10,9 @@ const CFG = Object.freeze(Object.assign({
 const CDN_SUPABASE = 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js';
 let sb;   // assegnato da start(), dopo il caricamento della libreria
 
+const fase = t => { const r = document.getElementById('root');
+  if (r) r.innerHTML = '<div class="spin"></div><div class="empty" style="padding-top:0">' + t + '</div>'; };
+
 const loadScript = src => new Promise((ok, ko) => {
   const t = document.createElement('script');
   t.src = src; t.async = false;
@@ -72,12 +75,22 @@ async function go(fn) { try { return await fn(); } catch (e) { console.error(e);
 
 /* ---------- accesso ---------- */
 async function boot() {
-  const ses = await sb.auth.getSession();
-  if (ses.error) throw ses.error;
-  const session = ses.data.session;
+  fase('Verifico l\'accesso…');
+  let session = null;
+  try {
+    const ses = await timeout(sb.auth.getSession(), 8000, 'sessione');
+    if (ses.error) throw ses.error;
+    session = ses.data.session;
+  } catch (e) {
+    console.warn('[WA CRM] sessione non leggibile:', e);
+    try { await sb.auth.signOut({ scope: 'local' }); } catch (e2) {}
+    return renderLogin('Sessione non leggibile: accedi di nuovo.');
+  }
   sb.auth.onAuthStateChange((_e, s) => { if (!s) { S.me = null; renderLogin(); } });
   if (!session) return renderLogin();
-  const { data, error } = await sb.from('agents').select('*').eq('id', session.user.id).maybeSingle();
+  fase('Carico il profilo…');
+  const { data, error } = await timeout(
+    sb.from('agents').select('*').eq('id', session.user.id).maybeSingle(), 12000, 'Il database non risponde');
   if (error) return err(error);
   if (!data) return renderLogin('Utente senza profilo agente. Contatta l\'amministratore.');
   if (!data.attivo) return renderLogin('Profilo non ancora attivato dall\'amministratore.');
@@ -105,8 +118,14 @@ function renderLogin(msg) {
   $('#lf').addEventListener('submit', e => {
     e.preventDefault();
     go(async () => {
-      const { error } = await sb.auth.signInWithPassword({ email: $('#em').value.trim(), password: $('#pw').value });
-      if (error) throw error;
+      const b = $('#lf').querySelector('button[type=submit]');
+      b.disabled = true; b.textContent = 'Accesso…';
+      try {
+        const { error } = await timeout(
+          sb.auth.signInWithPassword({ email: $('#em').value.trim(), password: $('#pw').value }),
+          15000, 'Il server non risponde: riprova');
+        if (error) throw error;
+      } finally { b.disabled = false; b.textContent = 'Accedi'; }
       $('#root').innerHTML = '<div class="spin"></div>';
       await boot();
     });
@@ -1056,6 +1075,7 @@ function fatal(e, dettaglio) {
 async function start() {
   try {
     if (!window.supabase) {
+      fase('Carico la libreria…');
       await timeout(loadScript(CFG.demo ? 'crm_demo.js' : CDN_SUPABASE), 20000,
         'Libreria non caricata: connessione assente o bloccata');
     }
@@ -1066,7 +1086,7 @@ async function start() {
     sb = window.supabase.createClient(CFG.supabaseUrl, CFG.supabaseKey, {
       db: { schema: CFG.schema }, auth: { persistSession: true, autoRefreshToken: true }
     });
-    await timeout(boot(), 25000, 'Il server non risponde: controlla la connessione');
+    await boot();
   } catch (e) {
     fatal(e, CFG.demo ? 'Modalità demo: serve il file crm_demo.js accanto a index.html.'
                       : 'Progetto: ' + (CFG.supabaseUrl || '—'));
