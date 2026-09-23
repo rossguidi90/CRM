@@ -420,6 +420,16 @@ addRoute('cliente', async (id) => {
           esc((ct || []).filter(p => p.data_fine).map(p => `${[p.nome, p.cognome].filter(Boolean).join(' ')} (fino a ${dmy(p.data_fine)})`).join(', '))
         }</span></span></div>` : ''}
     </div></div>
+    <div class="group"><h3>Spedizione e fatturazione</h3><div class="inset">
+      ${(() => { const d = datiCli(null, c); return `
+      ${kv('Spedire a', [d.sped_destinatario, indSped(d)].filter(Boolean).join(' · ') || '—')}
+      ${c.sped_diversa && c.sped_telefono ? kv('Tel. consegna', c.sped_telefono) : ''}
+      ${kv('Ragione sociale', c.ragione_sociale)}
+      ${kv('Sede fatturazione', indFatt(d) || '—')}
+      ${kv('P.IVA', c.p_iva || '—')}${kv('Codice fiscale', c.codice_fiscale)}
+      ${kv('Codice SDI', c.codice_sdi || (c.pec ? '' : '—'))}${kv('PEC', c.pec)}
+      ${!c.p_iva || !(c.codice_sdi || c.pec) ? '<div class="row"><span class="sub" style="color:var(--orange)">Mancano dati per la fattura: completali da Modifica → Fatturazione</span></div>' : ''}`; })()}
+    </div></div>
     <div class="group"><h3>Condizioni commerciali</h3><div class="inset">
       ${kv('Termini di pagamento', lbl(c.termini_pagamento) || '—')}
       ${c.modalita_pagamento ? kv('Note pagamento', c.modalita_pagamento) : ''}
@@ -1250,7 +1260,8 @@ addRoute('ordine', async (id, extra) => {
           <a href="#/cliente/${cli.id}"><div class="row">
             <span class="av">${esc(ini(cli.insegna || cli.ragione_sociale || '?'))}</span>
             <span style="flex:1;min-width:0"><span class="ttl">${esc(cli.insegna || cli.ragione_sociale || '—')}</span><br>
-              <span class="sub">${esc([cli.indirizzo, cli.finestra_consegna ? 'consegna ' + cli.finestra_consegna : null].filter(Boolean).join(' · '))}</span></span>
+              <span class="sub">${esc([indSped(datiCli(o, cli)) ? 'Spedizione: ' + indSped(datiCli(o, cli)) : null, cli.finestra_consegna ? 'consegna ' + cli.finestra_consegna : null].filter(Boolean).join(' · '))}</span>
+              ${!cli.p_iva || !(cli.codice_sdi || cli.pec) ? '<br><span class="sub" style="color:var(--orange)">Dati di fatturazione incompleti (P.IVA / SDI o PEC)</span>' : ''}</span>
             ${svg('chev', 14, 'chev')}</div></a>
           <div class="row"><label for="pag">Pagamento</label>
             <select id="pag" ${editabile ? '' : 'disabled'}>
@@ -1261,6 +1272,9 @@ addRoute('ordine', async (id, extra) => {
             ${editabile
               ? `<input id="scontoCli" type="number" min="0" max="100" step="0.5" inputmode="decimal" class="num-in" value="${f.sconto || 0}"> %`
               : `<span class="v mono">${f.sconto ? f.sconto + '%' : '—'}</span>`}</div>
+          ${o.omaggio_possibile > 0 ? `<div class="row"><label for="oProm">Promo: ${o.omaggio_possibile} bt in omaggio</label>
+            <span style="margin-left:auto;display:flex;align-items:center;gap:8px"><span class="sub">${o.applica_omaggio ? 'applicata' : 'non applicata'}</span>
+            <input id="oProm" type="checkbox" class="sw" ${o.applica_omaggio ? 'checked' : ''} ${editabile ? '' : 'disabled'}></span></div>` : ''}
           <div class="row"><label for="oCons">Consegna richiesta</label>
             <input id="oCons" type="date" value="${o.data_consegna || ''}" ${editabile ? '' : 'disabled'}></div>
           <div class="row col"><label for="oNote">Note ordine</label>
@@ -1366,6 +1380,11 @@ addRoute('ordine', async (id, extra) => {
       location.hash = '#/ordine/' + nid;
     }));
     $('#pdfOrd').addEventListener('click', () => pdfOrdine(o, [...items.values()], cli));
+    $('#oProm')?.addEventListener('change', e => go(async () => {
+      const r = await sb.from('orders').update({ applica_omaggio: e.target.checked }).eq('id', o.id).select().single();
+      if (r.error) throw r.error;
+      Object.assign(o, r.data); render();
+    }));
     [['#oNote', 'note'], ['#oCons', 'data_consegna']].forEach(([id, k]) => {
       const el = $(id); if (!el || el.disabled) return;
       el.addEventListener('change', e => go(async () => {
@@ -1395,16 +1414,47 @@ addRoute('ordine', async (id, extra) => {
   render();
 }, 'ordini');
 
+function datiCli(o, c) {
+  if (o?.dati_cliente) return o.dati_cliente;
+  c = c || {};
+  const d = !!c.sped_diversa;
+  return { ragione_sociale: c.ragione_sociale, insegna: c.insegna, p_iva: c.p_iva, codice_fiscale: c.codice_fiscale,
+    codice_sdi: c.codice_sdi, pec: c.pec, fatt_indirizzo: c.fatt_indirizzo || c.sede_legale, fatt_cap: c.fatt_cap,
+    fatt_citta: c.fatt_citta, fatt_prov: c.fatt_prov,
+    sped_destinatario: d ? c.sped_destinatario : (c.insegna || c.ragione_sociale), sped_indirizzo: d ? c.sped_indirizzo : c.indirizzo,
+    sped_cap: d ? c.sped_cap : c.cap, sped_citta: d ? c.sped_citta : c.citta, sped_telefono: (d && c.sped_telefono) || c.telefono,
+    finestra_consegna: c.finestra_consegna, note_consegna: c.note_consegna };
+}
+const indSped = d => [d.sped_indirizzo, [d.sped_cap, d.sped_citta].filter(Boolean).join(' ')].filter(Boolean).join(', ');
+const indFatt = d => [d.fatt_indirizzo, [d.fatt_cap, d.fatt_citta, d.fatt_prov ? '(' + d.fatt_prov + ')' : ''].filter(Boolean).join(' ')].filter(Boolean).join(', ');
+function righeDati(d) {
+  return [
+    'SPEDIZIONE',
+    d.sped_destinatario ? `Destinatario: ${d.sped_destinatario}` : '',
+    indSped(d) ? `Indirizzo: ${indSped(d)}` : '',
+    d.sped_telefono ? `Tel: ${d.sped_telefono}` : '',
+    d.finestra_consegna ? `Orari consegna: ${d.finestra_consegna}` : '',
+    d.note_consegna ? `Note consegna: ${d.note_consegna}` : '',
+    '—',
+    'FATTURAZIONE',
+    d.ragione_sociale ? `Ragione sociale: ${d.ragione_sociale}` : '',
+    indFatt(d) ? `Sede: ${indFatt(d)}` : '',
+    d.p_iva ? `P.IVA: ${d.p_iva}` : '',
+    d.codice_fiscale ? `C.F.: ${d.codice_fiscale}` : '',
+    d.codice_sdi ? `SDI: ${d.codice_sdi}` : '',
+    d.pec ? `PEC: ${d.pec}` : ''
+  ];
+}
 function testoOrdine(o, items, cli) {
   return [
     `${CFG.nome} · ordine ${o.numero}`,
     `Cliente: ${cli.insegna || cli.ragione_sociale || '—'}`,
-    '',
+    '—',
     ...items.map(i => [`${i.qty} bt · ${i.wine_label} · ${eur(i.prezzo_unitario)}`,
       num(i.sconto_pct) ? `sconto ${num(i.sconto_pct)}%` : '',
       i.qty_omaggio ? `di cui ${i.qty_omaggio} omaggio` : ''].filter(Boolean).join(' · ')),
     o.sconto_cliente_pct ? `Sconto cliente: ${num(o.sconto_cliente_pct)}%` : '',
-    '',
+    '—',
     `Imponibile: ${eur(o.imponibile)}`,
     o.sconto_pagamento ? `Sconto anticipato: − ${eur(o.sconto_pagamento)}` : '',
     o.omaggio_bt ? `Sconto merce: ${o.omaggio_bt} bt in omaggio` : '',
@@ -1412,13 +1462,15 @@ function testoOrdine(o, items, cli) {
     o.porto_franco ? 'Porto franco' : 'Trasporto a carico del cliente',
     `Pagamento: ${lbl(o.pagamento)}`,
     o.data_consegna ? `Consegna richiesta: ${dmy(o.data_consegna)}` : '',
-    o.note ? `Note: ${o.note}` : ''
-  ].filter(Boolean).join('\n');
+    o.note ? `Note: ${o.note}` : '',
+    '—',
+    ...righeDati(datiCli(o, cli))
+  ].filter(Boolean).map(x => x === '—' ? '' : x).join('\n');
 }
 function pdfOrdine(o, items, cli) {
   const w = window.open('', '_blank');
   if (!w) return toast('Consenti i popup per generare il PDF');
-  const ag = S.agents[o.agent_id];
+  const ag = S.agents[o.agent_id], D = datiCli(o, cli);
   const righe = items.map(i => {
     const paid = i.qty - (i.qty_omaggio || 0), net = paid * num(i.prezzo_unitario) * (1 - num(i.sconto_pct) / 100);
     return `<tr><td>${esc(i.wine_label)}</td><td class="r">${i.qty}${i.qty_omaggio ? `<small>di cui ${i.qty_omaggio} omaggio</small>` : ''}</td>
@@ -1431,7 +1483,7 @@ function pdfOrdine(o, items, cli) {
     body{font:12px/1.45 -apple-system,"Helvetica Neue",Arial,sans-serif;color:#161614;margin:0}
     header{display:flex;justify-content:space-between;align-items:flex-end;border-bottom:2px solid #161614;padding-bottom:10px;margin-bottom:18px}
     .brand{font-size:20px;font-weight:800;letter-spacing:.18em}.muted{color:#6B6B66}
-    h1{font-size:15px;margin:0;font-weight:700}.grid{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-bottom:18px}
+    h1{font-size:15px;margin:0;font-weight:700}.grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:18px;margin-bottom:18px}
     .box h3{font-size:9.5px;letter-spacing:.1em;text-transform:uppercase;color:#6B6B66;margin:0 0 4px}
     table{width:100%;border-collapse:collapse}th{font-size:9.5px;letter-spacing:.08em;text-transform:uppercase;color:#6B6B66;text-align:left;border-bottom:1px solid #161614;padding:6px 4px}
     td{padding:7px 4px;border-bottom:1px solid #E4E4DE;vertical-align:top}.r{text-align:right;white-space:nowrap}
@@ -1444,10 +1496,15 @@ function pdfOrdine(o, items, cli) {
   <header><div><div class="brand">${esc(CFG.nome.toUpperCase())}</div><div class="muted">Conferma d'ordine</div></div>
     <div style="text-align:right"><h1>${esc(o.numero)}</h1><div class="muted">${dmy(o.inviato_at || o.created_at)} · ${esc(lbl(o.stato))}</div></div></header>
   <div class="grid">
-    <div class="box"><h3>Cliente</h3><strong>${esc(cli.ragione_sociale || cli.insegna || '')}</strong>
-      ${cli.insegna && cli.ragione_sociale && cli.insegna !== cli.ragione_sociale ? `<br>${esc(cli.insegna)}` : ''}
-      <br>${esc([cli.indirizzo, [cli.cap, cli.citta].filter(Boolean).join(' ')].filter(Boolean).join(', '))}
-      ${cli.piva ? `<br>P.IVA ${esc(cli.piva)}` : ''}</div>
+    <div class="box"><h3>Fatturazione</h3><strong>${esc(D.ragione_sociale || D.insegna || '')}</strong>
+      ${indFatt(D) ? `<br>${esc(indFatt(D))}` : ''}
+      ${D.p_iva ? `<br>P.IVA ${esc(D.p_iva)}` : ''}${D.codice_fiscale ? ` · C.F. ${esc(D.codice_fiscale)}` : ''}
+      ${D.codice_sdi ? `<br>SDI ${esc(D.codice_sdi)}` : ''}${D.pec ? `${D.codice_sdi ? ' · ' : '<br>'}PEC ${esc(D.pec)}` : ''}</div>
+    <div class="box"><h3>Spedizione</h3><strong>${esc(D.sped_destinatario || '')}</strong>
+      ${indSped(D) ? `<br>${esc(indSped(D))}` : ''}
+      ${D.sped_telefono ? `<br>Tel. ${esc(D.sped_telefono)}` : ''}
+      ${D.finestra_consegna ? `<br>Orari consegna: ${esc(D.finestra_consegna)}` : ''}
+      ${D.note_consegna ? `<br><span class="muted">${esc(D.note_consegna)}</span>` : ''}</div>
     <div class="box"><h3>Condizioni</h3>Pagamento: ${esc(lbl(o.pagamento))}
       ${o.data_consegna ? `<br>Consegna richiesta: ${dmy(o.data_consegna)}` : ''}
       <br>${o.porto_franco ? 'Porto franco' : 'Trasporto a carico del cliente'}

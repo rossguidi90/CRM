@@ -71,12 +71,23 @@ const CrmClientForm = (() => {
       { k: 'finestra_consegna', l: 'Finestra di consegna', t: 'text', placeholder: 'es. 9-11:30' },
       { k: 'note_consegna', l: 'Note consegna', t: 'textarea', placeholder: 'ZTL, ingresso merci, citofono…' }
     ]},
+    { id: 'spedizione', title: 'Spedizione', fields: [
+      { k: 'sped_diversa', l: 'Spedire a un indirizzo diverso dal locale', t: 'bool' },
+      { k: 'sped_destinatario', l: 'Destinatario', t: 'text', placeholder: 'es. Magazzino / nome del locale', showIf: v => v.sped_diversa },
+      { k: 'sped_indirizzo', l: 'Indirizzo di spedizione', t: 'text', showIf: v => v.sped_diversa },
+      { k: 'sped_cap', l: 'CAP', t: 'text', inputmode: 'numeric', max: 5, showIf: v => v.sped_diversa },
+      { k: 'sped_citta', l: 'Città', t: 'text', showIf: v => v.sped_diversa },
+      { k: 'sped_telefono', l: 'Telefono per la consegna', t: 'tel', showIf: v => v.sped_diversa }
+    ]},
     { id: 'amministrazione', title: 'Fatturazione', fields: [
       { k: 'p_iva', l: 'Partita IVA', t: 'text', inputmode: 'numeric', max: 11 },
       { k: 'codice_fiscale', l: 'Codice fiscale', t: 'text', max: 16, upper: true },
       { k: 'codice_sdi', l: 'Codice SDI', t: 'text', max: 7, upper: true },
       { k: 'pec', l: 'PEC', t: 'email' },
-      { k: 'sede_legale', l: 'Sede legale', t: 'text' },
+      { k: 'fatt_indirizzo', l: 'Sede legale · indirizzo', t: 'text', placeholder: 'via e numero civico' },
+      { k: 'fatt_cap', l: 'Sede legale · CAP', t: 'text', inputmode: 'numeric', max: 5 },
+      { k: 'fatt_citta', l: 'Sede legale · città', t: 'text' },
+      { k: 'fatt_prov', l: 'Provincia', t: 'text', max: 2, upper: true, placeholder: 'MI' },
       { k: 'termini_pagamento', l: 'Termini di pagamento', t: 'list', o: OPT.pagamento },
       { k: 'modalita_pagamento', l: 'Note pagamento', t: 'text' },
       { k: 'sconto_concordato_pct', l: 'Sconto concordato (%)', t: 'number', placeholder: 'es. 5', min: 0, max: 100 }
@@ -203,7 +214,7 @@ const CrmClientForm = (() => {
         box.lastElementChild.querySelector('input[name$=".nome"]')?.focus();
       }
     });
-    root.addEventListener('change', e => { if (e.target.name === 'vino_calice') rerender?.(read(root.querySelector('form'))); });
+    root.addEventListener('change', e => { if (['vino_calice', 'sped_diversa'].includes(e.target.name)) rerender?.(read(root.querySelector('form'))); });
     let t;
     root.addEventListener('input', e => {
       if (!e.target.matches('[data-venue-search]')) return;
