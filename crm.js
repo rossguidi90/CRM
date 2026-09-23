@@ -55,7 +55,7 @@ const ICON = {
   cerca: 'M11 4a7 7 0 1 0 0 14 7 7 0 0 0 0-14M21 21l-5-5',
   chev: 'M9 6l6 6-6 6', piu: 'M12 5v14M5 12h14',
   tel: 'M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2',
-  chat: 'M4 5h16v11H9l-5 4z', tema: 'M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z',
+  chat: 'M4 5h16v11H9l-5 4z', matita: 'M4 20h4L19 9l-4-4L4 16zM14 6l4 4', scarica: 'M12 4v11M7 10l5 5 5-5M5 20h14', tema: 'M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z',
   cart: 'M3 4h2.5l2.3 11.2h10.4L21 8H6.6M9.5 20.2h.01M17.5 20.2h.01', cal: 'M4 6h16v14H4zM4 10h16M8 3v5M16 3v5', doc: 'M7 3h8l4 4v14H7zM15 3v4h4M10 13h6M10 17h4',
   rifai: 'M4 12a8 8 0 0 1 14-5.3L20 9M20 4v5h-5M20 12a8 8 0 0 1-14 5.3L4 15M4 20v-5h5', mail: 'M3 6h18v12H3zM3 7l9 6 9-6',
   pin: 'M12 21s-7-6.5-7-12a7 7 0 0 1 14 0c0 5.5-7 12-7 12zM12 11.5a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5',
@@ -240,7 +240,7 @@ addRoute('home', async () => {
     sb.from('orders').select('id, numero, stato, totale, created_at, client_id, agent_id').order('created_at', { ascending: false }).limit(6),
     (() => { let q = sb.from('reminders').select('*').eq('fatto', false)
       .lte('due_at', new Date(Date.now() + 7 * 864e5).toISOString()).order('due_at').limit(20);
-      return isAdmin() || isViewer() ? q : q.eq('agent_id', S.me.id); })()
+      return q; })()
   ]);
   if (ordini.error) throw ordini.error;
   const mesi = [...Array(6)].map((_, i) => { const d = new Date(oggi.getFullYear(), oggi.getMonth() - 5 + i, 1);
@@ -260,7 +260,7 @@ addRoute('home', async () => {
     <div class="kpis">
       ${kpi('Fatturato mese', eur(t.fatturato || 0), `${t.ordini || 0} ordini confermati`, '', spark)}
       ${kpi('In attesa', String(attesa), 'ordini inviati da confermare', attesa ? 'orange' : '')}
-      ${kpi('Clienti', String(S.clients.filter(c => isAdmin() || isViewer() || mine(c)).length), isAdmin() || isViewer() ? 'in rete' : 'assegnati a te')}
+      ${kpi('Clienti', String(S.clients.length), isAdmin() || isViewer() ? 'in rete' : `in rete · ${S.clients.filter(mine).length} tuoi`)}
       ${kpi('Da richiamare', String((recall || []).length), 'oltre il ritmo abituale', recall?.length ? 'orange' : '')}
     </div>
     <div class="group"><h3>Promemoria · prossimi 7 giorni</h3><div class="inset" id="promList">
@@ -277,7 +277,7 @@ addRoute('home', async () => {
         `${nome(o.client_id)} · ${dmy(o.created_at)}${S.agents[o.agent_id] && innerWidth < 720 ? ' · ' + S.agents[o.agent_id].nome : ''}`, `${S.agents[o.agent_id] ? `<span class="pill hide-m"><i class="dot-ag" style="--ac:${S.agents[o.agent_id].colore}"></i>${esc(S.agents[o.agent_id].nome)}</span>` : ''}<span class="mono">${eur(o.totale)}</span>${pill(o.stato)}`, false)).join('')
         || '<div class="empty">Nessun ordine.</div>'}
     </div></div>`);
-  bindProm($('#promList'));
+  bindProm($('#promList'), prom);
 });
 const kpi = (l, v, n, tone = '', extra = '') =>
   `<div class="kpi"><span class="l">${esc(l)}</span><span class="v mono">${esc(v)}</span>
@@ -474,9 +474,26 @@ addRoute('cliente', async (id) => {
         || '<div class="empty">Nessun ordine registrato.</div>'}
     </div></div>`);
   $('#ord')?.addEventListener('click', () => (location.hash = '#/ordine/nuovo/' + c.id));
+  if (ed) {
+    const MAPPA = { 'Referenti': 'contatti', 'Spedizione e fatturazione': 'amministrazione', 'Condizioni commerciali': 'amministrazione',
+      'Profilo carta vini': 'carta', 'Note / Diario': 'note' };
+    document.querySelectorAll('#main .group > h3').forEach(h => {
+      const sec = MAPPA[h.textContent.trim()]; if (!sec) return;
+      h.classList.add('h3act');
+      h.innerHTML = `<span>${h.innerHTML}</span><button class="btn line sm edit-sec" data-sec="${sec}" aria-label="Modifica">${svg('matita', 13)} Modifica</button>`;
+      const box = h.nextElementSibling;
+      if (box && sec !== 'contatti') { box.classList.add('editable'); box.dataset.sec = sec; }
+    });
+    $('#main').addEventListener('click', e => {
+      const t = e.target.closest('.edit-sec, .inset.editable');
+      if (!t || e.target.closest('a,button:not(.edit-sec)')) return;
+      editCliente(c, ct || [], t.dataset.sec);
+    });
+    document.querySelector('#main h1')?.addEventListener('click', () => editCliente(c, ct || [], 'anagrafica'));
+  }
   $('#appt').addEventListener('click', () => nuovoPromemoria(c, 'appuntamento'));
   $('#promNew')?.addEventListener('click', () => nuovoPromemoria(c, 'promemoria'));
-  bindProm($('#promList'));
+  bindProm($('#promList'), prom);
   $('#rifai')?.addEventListener('click', () => go(async () => {
     const o = (storico || []).find(x => x.stato !== 'annullato');
     if (!o || !confirm(`Creare una nuova bozza uguale all'ordine ${o.numero}?`)) return;
@@ -522,7 +539,7 @@ function modal(inner) {
   return el;
 }
 
-function editCliente(c, contatti = []) {
+function editCliente(c, contatti = [], sezione) {
   const nuovo = !c;
   const m = modal(`<div class="bar"><h2>${nuovo ? 'Nuovo cliente' : 'Modifica scheda'}</h2>
       <span style="flex:1"></span><button class="btn line sm" data-x>Chiudi</button></div>
@@ -535,6 +552,12 @@ function editCliente(c, contatti = []) {
   const host = $('#cf', m);
   const draw = (vals, cts) => { host.innerHTML = CrmClientForm.render(vals, cts, { ro: false }); };
   draw(c || {}, contatti);
+  if (sezione) setTimeout(() => {
+    const el = m.querySelector(`[data-sec="${sezione}"]`); if (!el) return;
+    el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    el.classList.add('flash'); setTimeout(() => el.classList.remove('flash'), 1400);
+    el.querySelector('input,select,textarea')?.focus({ preventScroll: true });
+  }, 380);
   m.querySelector('[data-x]').addEventListener('click', () => m.remove());
   CrmClientForm.bind(host, {
     rerender: ({ client, contacts }) => draw(client, contacts),
@@ -633,12 +656,32 @@ function rigaProm(r, conCliente) {
     <span style="flex:1;min-width:0">
       <span class="ttl" style="font-size:15px">${cli ? `<a href="#/cliente/${cli.id}">${esc(cli.insegna || cli.ragione_sociale)}</a> · ` : ''}${esc(r.testo || (r.tipo === 'appuntamento' ? 'Appuntamento' : 'Promemoria'))}</span><br>
       <span class="sub">${r.tipo === 'appuntamento' ? svg('cal', 12) + ' ' : ''}${dmy(r.due_at)} · ${hm(r.due_at)}${late ? ' · scaduto' : ''}${S.agents[r.agent_id] && S.agents[r.agent_id].id !== S.me.id ? ' · ' + esc(S.agents[r.agent_id].nome) : ''}</span></span>
-    ${r.tipo === 'appuntamento' ? `<a class="btn ghost sm" href="${gcalLink(r, cli || S.clients.find(c => c.id === r.client_id))}" target="_blank" rel="noopener" aria-label="Apri in Google Calendar">${svg('cal', 16)}</a>` : ''}
+    ${r.tipo === 'appuntamento' ? `<button class="btn line sm" data-cal="${r.id}" aria-label="Aggiungi al calendario">${svg('cal', 15)}<span class="hide-m">&nbsp;Calendario</span></button>` : ''}
   </div>`;
 }
-function bindProm(box) {
+function outlookLink(r, c) {
+  const a = new Date(r.due_at), b = new Date(a.getTime() + (r.durata_min || 60) * 60000);
+  const q = new URLSearchParams({ path: '/calendar/action/compose', rru: 'addevent', startdt: a.toISOString(), enddt: b.toISOString(),
+    subject: `${c?.insegna || c?.ragione_sociale || 'Cliente'} · ${r.testo || 'Appuntamento'}`,
+    location: [c?.indirizzo, c?.cap, c?.citta].filter(Boolean).join(', '), body: `${CFG.nome} CRM` });
+  return 'https://outlook.office.com/calendar/deeplink/compose?' + q;
+}
+function sceltaCalendario(r, c) {
+  const m = modal(`<div class="bar"><h2>Aggiungi al calendario</h2><span style="flex:1"></span><button class="btn line sm" data-x>Chiudi</button></div>
+    <div class="sub" style="padding:0 4px 12px">${esc(c?.insegna || c?.ragione_sociale || '')} · ${dmy(r.due_at)} ${hm(r.due_at)}${r.testo ? ' · ' + esc(r.testo) : ''}</div>
+    <div class="calsel">
+      <a class="btn line" href="${gcalLink(r, c)}" target="_blank" rel="noopener">Google Calendar</a>
+      <a class="btn line" href="${outlookLink(r, c)}" target="_blank" rel="noopener">Outlook</a>
+      <button class="btn line" data-ics>Calendario del computer / iPhone (.ics)</button></div>
+    <div class="sub" style="padding:10px 4px 0">Il file .ics si apre con Calendario di Mac, iPhone e Outlook desktop, con avviso 30 minuti prima.</div>`);
+  m.querySelector('[data-x]').addEventListener('click', () => m.remove());
+  m.querySelector('[data-ics]').addEventListener('click', () => { scaricaIcs(r, c); m.remove(); });
+}
+function bindProm(box, lista) {
   if (!box) return;
   box.addEventListener('click', e => {
+    const cb = e.target.closest('[data-cal]');
+    if (cb) { const r = (lista || []).find(x => x.id === cb.dataset.cal); if (r) sceltaCalendario(r, S.clients.find(c => c.id === r.client_id)); return; }
     const b = e.target.closest('[data-done]'); if (!b) return;
     go(async () => {
       b.classList.add('on');
@@ -691,7 +734,8 @@ function nuovoPromemoria(c, tipo) {
       <div class="sub" style="padding:0 4px 8px">Salvato. Aggiungilo anche al tuo calendario:</div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
         <a class="btn line" id="rg" target="_blank" rel="noopener">Google Calendar</a>
-        <button class="btn line" id="ri">Apple / Outlook</button></div></div>`);
+        <a class="btn line" id="ro" target="_blank" rel="noopener">Outlook</a>
+        <button class="btn line" id="ri" style="grid-column:1/-1">Calendario del computer / iPhone (.ics)</button></div></div>`);
   let t = tipo;
   const syncT = () => { $('#rdur', m).style.display = t === 'appuntamento' ? '' : 'none'; };
   syncT();
@@ -713,7 +757,7 @@ function nuovoPromemoria(c, tipo) {
     toast(t === 'appuntamento' ? 'Appuntamento salvato' : 'Promemoria salvato');
     if (t !== 'appuntamento') { m.remove(); if (S.view === 'cliente' || S.view === 'home') route(); return; }
     b.classList.add('hide'); $('#rcal', m).classList.remove('hide');
-    $('#rg', m).href = gcalLink(r, c);
+    $('#rg', m).href = gcalLink(r, c); $('#ro', m).href = outlookLink(r, c);
     $('#ri', m).addEventListener('click', () => scaricaIcs(r, c));
     m.querySelector('[data-x]').onclick = () => { m.remove(); route(); };
   }));
@@ -1126,6 +1170,12 @@ addRoute('ordine', async (id, extra) => {
   ]);
   if (error) throw error;
   const cli = S.clients.find(c => c.id === o.client_id) || {};
+  const { data: storia } = await sb.from('order_items')
+    .select('wine_id, qty, qty_omaggio, prezzo_unitario, sconto_pct, orders!inner(id, client_id, stato, numero, created_at, inviato_at)')
+    .eq('orders.client_id', o.client_id).neq('orders.stato', 'annullato').neq('orders.stato', 'bozza').neq('order_id', id);
+  const ultimo = {};
+  (storia || []).forEach(i => { const d = i.orders.inviato_at || i.orders.created_at;
+    if (!ultimo[i.wine_id] || d > ultimo[i.wine_id].d) ultimo[i.wine_id] = { ...i, d }; });
   const ST = Object.fromEntries((stock || []).map(s => [s.wine_id, s]));
   const fz = w => !w.vendibile_milano;
   const catalogo = ordinaCat((ws || []).filter(w => ST[w.id]?.vendibile ||
@@ -1138,40 +1188,66 @@ addRoute('ordine', async (id, extra) => {
   const noSc = w => w.no_sconto || w.disponibilita === 'assegnazione';
   const netto = (w, it) => (it.qty - (it.qty_omaggio || 0)) * num(it.prezzo_unitario ?? w.prezzo_listino) * (1 - num(it.sconto_pct) / 100);
 
-  async function setQty(w, q) {
+  // aggiornamento immediato a schermo, salvataggio raggruppato in sottofondo
+  const srv = new Map((rows || []).map(i => [i.wine_id, i]));
+  const pend = new Set(); let flushT = null, flushing = null;
+  function setQty(w, q) {
+    q = Math.max(0, Math.round(q));
     const it = items.get(w.id);
     if (!it && q > 0 && fz(w)) toast(`⚠︎ Fuori zona: ${w.esclusiva || 'non vendibile su ' + CFG.zona}. Verifica prima di inviare.`, 5000);
-    if (q <= 0 && it) {
-      const r = await sb.from('order_items').delete().eq('id', it.id);
-      if (r.error) throw r.error;
-      items.delete(w.id);
-    } else if (it) {
-      const patch = { qty: q };
-      if ((it.qty_omaggio || 0) > q) patch.qty_omaggio = q;
-      const r = await sb.from('order_items').update(patch).eq('id', it.id);
-      if (r.error) throw r.error;
-      Object.assign(it, patch);
-    } else if (q > 0) {
-      const r = await sb.from('order_items').insert({ order_id: o.id, wine_id: w.id, qty: q, sconto_pct: f.sconto || 0 }).select().single();
-      if (r.error) throw r.error;
-      items.set(w.id, r.data);
-    }
-    const fresh = await sb.from('orders').select('*').eq('id', o.id).single();
-    if (fresh.data) Object.assign(o, fresh.data);
+    if (q <= 0) items.delete(w.id);
+    else if (it) { it.qty = q; if ((it.qty_omaggio || 0) > q) it.qty_omaggio = q; }
+    else items.set(w.id, { wine_id: w.id, qty: q, sconto_pct: f.sconto || 0, qty_omaggio: 0, prezzo_unitario: w.prezzo_listino });
+    pend.add(w.id); f.dirty = true;
     render();
+    clearTimeout(flushT); flushT = setTimeout(() => go(flush), 450);
+  }
+  async function flush() {
+    if (flushing) { await flushing; }
+    const ids = [...pend]; pend.clear(); if (!ids.length) return;
+    flushing = (async () => {
+      try {
+        for (const wid of ids) {
+          const loc = items.get(wid), row = srv.get(wid), q = loc?.qty || 0;
+          if (!q && row) {
+            const r = await sb.from('order_items').delete().eq('id', row.id); if (r.error) throw r.error; srv.delete(wid);
+          } else if (q && row) {
+            if (row.qty === q && (row.qty_omaggio || 0) === (loc.qty_omaggio || 0)) continue;
+            const r = await sb.from('order_items').update({ qty: q, qty_omaggio: Math.min(loc.qty_omaggio || 0, q) }).eq('id', row.id).select().single();
+            if (r.error) throw r.error; srv.set(wid, r.data);
+          } else if (q) {
+            const r = await sb.from('order_items').insert({ order_id: o.id, wine_id: wid, qty: q, sconto_pct: loc.sconto_pct || 0 }).select().single();
+            if (r.error) throw r.error; srv.set(wid, r.data);
+          }
+          if (!pend.has(wid) && srv.has(wid) && items.has(wid)) items.set(wid, { ...srv.get(wid) });
+        }
+      } catch (e) {
+        // riallinea con il database e mostra l'errore
+        const { data } = await sb.from('order_items').select('*').eq('order_id', o.id);
+        srv.clear(); items.clear(); (data || []).forEach(i => { srv.set(i.wine_id, i); items.set(i.wine_id, { ...i }); });
+        throw e;
+      } finally {
+        const fresh = await sb.from('orders').select('*').eq('id', o.id).single();
+        if (fresh.data) Object.assign(o, fresh.data);
+        f.dirty = pend.size > 0; flushing = null; render();
+      }
+    })();
+    return flushing;
   }
 
   async function setRiga(w, patch) {
-    const it = items.get(w.id); if (!it) return;
-    const r = await sb.from('order_items').update(patch).eq('id', it.id).select().single();
+    if (pend.size) { clearTimeout(flushT); await flush(); }
+    const row = srv.get(w.id); if (!row) return;
+    const r = await sb.from('order_items').update(patch).eq('id', row.id).select().single();
     if (r.error) throw r.error;
-    items.set(w.id, r.data);
+    srv.set(w.id, r.data); items.set(w.id, { ...r.data });
     const fresh = await sb.from('orders').select('*').eq('id', o.id).single();
     if (fresh.data) Object.assign(o, fresh.data);
     render();
   }
 
   async function applySconto(val) {
+    if (pend.size) { clearTimeout(flushT); await flush(); }
     f.sconto = Math.max(0, Math.min(100, Number(val) || 0));
     const u = await sb.from('orders').update({ sconto_cliente_pct: f.sconto }).eq('id', o.id);
     if (u.error) throw u.error;
@@ -1179,8 +1255,8 @@ addRoute('ordine', async (id, extra) => {
       const r = await sb.from('order_items').update({ sconto_pct: f.sconto }).eq('order_id', o.id);
       if (r.error) throw r.error;
       const rows = await sb.from('order_items').select('*').eq('order_id', o.id);
-      items.clear();
-      (rows.data || []).forEach(i => items.set(i.wine_id, i));
+      items.clear(); srv.clear();
+      (rows.data || []).forEach(i => { items.set(i.wine_id, { ...i }); srv.set(i.wine_id, i); });
     }
     const fresh = await sb.from('orders').select('*').eq('id', o.id).single();
     if (fresh.data) Object.assign(o, fresh.data);
@@ -1196,6 +1272,9 @@ addRoute('ordine', async (id, extra) => {
         ${fz(w) ? `<span class="stamp" title="${esc(w.esclusiva || '')}">Fuori zona</span>` : ''}
         ${nomeVino(w)}
         ${fz(w) && w.esclusiva ? `<span class="sub" style="display:block;color:var(--red)">${esc(w.esclusiva)}</span>` : ''}
+        ${ultimo[w.id] ? (() => { const u = ultimo[w.id], net = num(u.prezzo_unitario) * (1 - num(u.sconto_pct) / 100),
+            d = num(w.prezzo_listino) - num(u.prezzo_unitario);
+          return `<span class="hist" title="Ordine ${esc(u.orders.numero)}">↺ Ultimo: ${u.qty} bt a ${eur(net)}${num(u.sconto_pct) ? ` (−${num(u.sconto_pct)}%)` : ''} · ${dmy(u.d)}${Math.abs(d) > 0.004 ? ` · <b style="color:${d > 0 ? 'var(--orange)' : 'var(--green)'}">listino ${d > 0 ? '+' : '−'}${eur(Math.abs(d))}</b>` : ''}</span>`; })() : ''}
         <span class="sub">${esc([w.formato_cl ? w.formato_cl + ' cl' : null, w.zona_produzione].filter(Boolean).join(' · '))}</span><br>
         <span class="sub mono" style="font-weight:600">${eur(w.prezzo_listino)}
           <span style="color:${tono}">· ${esc(disp)}</span>
@@ -1241,7 +1320,9 @@ addRoute('ordine', async (id, extra) => {
     const bt = [...items.values()].reduce((a, i) => a + i.qty, 0);
     const lordoTot = scelti.reduce((a, w) => { const it = items.get(w.id); return a + it.qty * num(it.prezzo_unitario ?? w.prezzo_listino); }, 0);
     const scontiTot = lordoTot - num(o.imponibile);
-    const riep = `          ${scontiTot > 0.004 ? kv('Totale listino', eur(lordoTot)) + kv('Sconti e omaggi', '− ' + eur(scontiTot)) : ''}
+    const impLoc = scelti.reduce((a, w) => a + netto(w, items.get(w.id)), 0);
+    const riep = f.dirty ? `${kv('Imponibile (provvisorio)', eur(impLoc))}
+          <div class="row"><label>Totale</label><span class="v sub">aggiornamento…</span></div>` : `          ${scontiTot > 0.004 ? kv('Totale listino', eur(lordoTot)) + kv('Sconti e omaggi', '− ' + eur(scontiTot)) : ''}
           ${kv('Imponibile', eur(o.imponibile))}
           ${o.sconto_pagamento ? kv('Sconto pagamento anticipato', '− ' + eur(o.sconto_pagamento)) : ''}
           ${o.omaggio_bt ? kv('Sconto merce', `${o.omaggio_bt} bt omaggio · ${esc(items.get(o.omaggio_wine_id)?.wine_label || '')}`) : ''}
@@ -1263,7 +1344,9 @@ addRoute('ordine', async (id, extra) => {
           ${o.stato === 'bozza' && (isAdmin() || o.agent_id === S.me.id) ? '<button class="btn line sm" id="delOrd" style="color:var(--red)">Elimina</button>' : ''}
           <button class="btn line sm" id="mailOrd" aria-label="Email">${svg('mail', 16)}<span class="hide-m">&nbsp;Email</span></button>
           <button class="btn line sm" id="waOrd" aria-label="WhatsApp">${svg('chat', 16)}<span class="hide-m">&nbsp;WhatsApp</span></button></div>
-        <h1 class="mono" style="font-size:22px;display:flex;align-items:center;gap:10px">${esc(o.numero)} ${pill(o.stato)}</h1>
+        <h1 class="mono" style="font-size:22px;display:flex;align-items:center;gap:10px;flex-wrap:wrap">${esc(o.numero)} ${pill(o.stato)}
+          ${o.email_inviata_at ? `<span class="pill attivo" style="font-family:var(--font)">✓ email inviata ${dmy(o.email_inviata_at)}</span>` : ''}
+          ${o.stato !== 'bozza' && !o.email_inviata_at && (isAdmin() || o.agent_id === S.me.id) ? '<button class="btn line sm" id="reMail" style="font-family:var(--font)">Invia email ora</button>' : ''}</h1>
         <div class="inset" style="margin-top:12px">
           <a href="#/cliente/${cli.id}"><div class="row">
             <span class="av">${esc(ini(cli.insegna || cli.ragione_sociale || '?'))}</span>
@@ -1388,6 +1471,12 @@ addRoute('ordine', async (id, extra) => {
       location.hash = '#/ordine/' + nid;
     }));
     $('#pdfOrd').addEventListener('click', () => pdfOrdine(o, [...items.values()], cli));
+    $('#reMail')?.addEventListener('click', () => go(async () => {
+      const res = await inviaEmailOrdine(o.id);
+      if (res === 'ok') { toast('Email inviata'); route(); }
+      else if (res === 'off') mailOrdine(o, [...items.values()], cli);
+      else toast('Email non inviata: ' + res, 6000);
+    }));
     $('#oProm')?.addEventListener('change', e => go(async () => {
       const r = await sb.from('orders').update({ applica_omaggio: e.target.checked }).eq('id', o.id).select().single();
       if (r.error) throw r.error;
@@ -1410,6 +1499,7 @@ addRoute('ordine', async (id, extra) => {
       location.hash = '#/ordini';
     }));
     document.querySelectorAll('[data-go]').forEach(b => b.addEventListener('click', () => go(async () => {
+      if (pend.size || flushing) { clearTimeout(flushT); await flush(); }
       const fuori = scelti.filter(fz);
       if (b.dataset.go === 'inviato' && fuori.length &&
           !confirm(`Attenzione: l'ordine contiene ${fuori.length} referenz${fuori.length === 1 ? 'a' : 'e'} fuori zona:\n\n` +
@@ -1418,7 +1508,13 @@ addRoute('ordine', async (id, extra) => {
       try {
         const r = await sb.from('orders').update({ stato: b.dataset.go }).eq('id', o.id).select().single();
         if (r.error) throw r.error;
-        toast('Ordine ' + lbl(b.dataset.go).toLowerCase());
+        if (b.dataset.go === 'inviato') {
+          const res = await inviaEmailOrdine(o.id);
+          if (res === 'ok') toast('Ordine inviato · email partita a ' + ORD_EMAIL_TO[0], 4000);
+          else if (res === 'off') { toast('Ordine inviato. Invio email automatico non attivo: uso la tua app di posta', 4500);
+            mailOrdine(Object.assign(o, r.data), [...items.values()], cli); }
+          else toast('Ordine inviato, ma l\'email non è partita: ' + res + '. Usa il tasto Email.', 6000);
+        } else toast('Ordine ' + lbl(b.dataset.go).toLowerCase());
         route();
       } finally { b.disabled = false; }
     })));
@@ -1536,6 +1632,17 @@ function pdfOrdine(o, items, cli) {
   <script>window.onload=()=>setTimeout(()=>window.print(),250)<\/script></body></html>`);
   w.document.close();
 }
+async function inviaEmailOrdine(id) {
+  try {
+    const { data, error } = await sb.functions.invoke('invia-ordine', { body: { order_id: id } });
+    if (!error && data?.ok) return 'ok';
+    const st = error?.context?.status;
+    if (st === 501) return 'off';
+    let msg = error?.message || 'errore';
+    try { msg = (await error.context.json()).error || msg; } catch (e) {}
+    return msg;
+  } catch (e) { return String(e.message || e); }
+}
 const ORD_EMAIL_TO = ['ordini@winealchemist.it', 'info@winealchemist.it'];
 const ORD_WHATSAPP = '393914175784'; // Fabio
 function mailOrdine(o, items, cli) {
@@ -1558,7 +1665,7 @@ addRoute('analisi', async () => {
   const [trend, top, perAgente, perZona, riordini, recall] = await Promise.all([
     CrmInsights.trend(sb, da, oggi, { agent: agente, grain: 'month' }),
     CrmInsights.breakdown(sb, da, oggi, 'wine', { agent: agente, limit: 8 }),
-    isAdmin() ? CrmInsights.breakdown(sb, da, oggi, 'agent', { agent: agente, limit: 10 }) : [],
+    CrmInsights.breakdown(sb, da, oggi, 'agent', { agent: agente, limit: 10 }),
     CrmInsights.breakdown(sb, da, oggi, 'zona', { agent: agente, limit: 8 }),
     CrmInsights.reorder(sb).catch(() => []),
     CrmInsights.toRecall(sb)
@@ -1581,7 +1688,7 @@ addRoute('analisi', async () => {
   paint(`<div class="bar"><h1>Analisi</h1></div>
     <div class="seg" style="margin-bottom:12px">${PERIODI.map(([k, l]) =>
       `<button data-per="${k}" class="${per === k ? 'on' : ''}">${l}</button>`).join('')}</div>
-    ${isAdmin() ? `<div class="row inset" style="margin-bottom:12px"><label for="ag">Agente</label>
+    ${true ? `<div class="row inset" style="margin-bottom:12px"><label for="ag">Agente</label>
       <select id="ag"><option value="">Tutta la rete</option>
         ${Object.values(S.agents).filter(a => a.ruolo === 'agent').map(a =>
           `<option value="${a.id}" ${agente === a.id ? 'selected' : ''}>${esc(a.nome)}</option>`).join('')}
@@ -1606,7 +1713,11 @@ addRoute('analisi', async () => {
       </div>
     </div>
     ${classifica('Referenze più vendute', top)}
-    ${isAdmin() ? classifica('Per agente', perAgente) : ''}
+    ${classifica('Per agente', perAgente)}
+    ${isAdmin() ? `<div class="group"><h3>Backup</h3><div class="inset"><div class="row">
+      <span style="flex:1"><span class="ttl" style="font-size:15px">Copia completa dei dati</span><br>
+      <span class="sub">Automatica ogni 3 giorni nel database. Qui la scarichi in Excel per tenerla anche sul computer.</span></span>
+      <button class="btn line sm" id="bkp">${svg('scarica', 15)} Scarica Excel</button></div></div></div>` : ''}
     ${classifica('Per zona', perZona)}
     <div class="group"><h3>Da riordinare</h3><div class="inset">
       ${(riordini || []).slice(0, 10).map(r => `<div class="row">
@@ -1628,7 +1739,26 @@ addRoute('analisi', async () => {
   });
   const ag = $('#ag');
   if (ag) ag.addEventListener('change', e => { S.agente = e.target.value || null; route(); });
+  $('#bkp')?.addEventListener('click', () => go(scaricaBackup));
 });
+
+function caricaScript(src) {
+  return new Promise((ok, ko) => { const s = document.createElement('script'); s.src = src; s.onload = ok; s.onerror = () => ko(new Error('Libreria non caricata')); document.head.appendChild(s); });
+}
+async function scaricaBackup() {
+  toast('Preparo il backup…');
+  if (!window.XLSX) await caricaScript('https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js');
+  const tab = ['clients', 'client_contacts', 'orders', 'order_items', 'wines', 'activities', 'reminders', 'agents'];
+  const wb = XLSX.utils.book_new();
+  for (const t of tab) {
+    const { data, error } = await sb.from(t).select('*').limit(20000);
+    if (error) throw error;
+    const rows = (data || []).map(r => Object.fromEntries(Object.entries(r).map(([k, v]) => [k, v && typeof v === 'object' ? JSON.stringify(v) : v])));
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rows.length ? rows : [{}]), t.slice(0, 31));
+  }
+  XLSX.writeFile(wb, `backup-wine-alchemist-${new Date().toLocaleDateString('sv-SE')}.xlsx`);
+  toast('Backup scaricato');
+}
 
 /* ---------- avvio ---------- */
 function fatal(e, dettaglio) {
