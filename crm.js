@@ -159,9 +159,10 @@ function renderShell() {
       </div>
     </aside>
     <main id="main"></main>
-    <nav id="tabbar">${NAV.filter(n => n[0] !== 'analisi').map(([k, l, h]) =>
+    <nav id="tabbar">${NAV.map(([k, l, h]) =>
       `<a href="${h}" data-nav="${k}">${svg(k, 25)}<span>${l}</span></a>`).join('')}</nav>
   </div>`;
+  document.addEventListener('click', e => { if (e.target.id === 'out2') $('#out').click(); });
   $('#out').addEventListener('click', () => go(async () => { await sb.auth.signOut(); location.hash = ''; renderLogin(); }));
 }
 const isAdmin = () => S.me?.ruolo === 'admin';
@@ -203,11 +204,12 @@ addRoute('home', async () => {
   const nome = c => { const x = S.clients.find(k => k.id === c); return x ? (x.insegna || x.ragione_sociale) : '—'; };
   paint(`
     <div class="bar"><div><div class="sub">${esc(new Date().toLocaleDateString('it-IT', { weekday: 'long', day: 'numeric', month: 'long' }))}</div>
-      <h1>Ciao, ${esc(S.me.nome.split(' ')[0])}</h1></div></div>
+      <h1>Ciao, ${esc(S.me.nome.split(' ')[0])}</h1></div><span style="flex:1"></span>
+      <button class="btn line sm hide-desktop" id="out2">Esci</button></div>
     <div class="kpis">
       ${kpi('Fatturato mese', eur(t.fatturato || 0), `${t.ordini || 0} ordini confermati`)}
       ${kpi('In attesa', String(attesa), 'ordini inviati da confermare', attesa ? 'orange' : '')}
-      ${kpi('Clienti', String(S.clients.filter(c => isAdmin() || mine(c)).length), isAdmin() ? 'in rete' : 'assegnati a te')}
+      ${kpi('Clienti', String(S.clients.filter(c => isAdmin() || isViewer() || mine(c)).length), isAdmin() || isViewer() ? 'in rete' : 'assegnati a te')}
       ${kpi('Da richiamare', String((recall || []).length), 'oltre il ritmo abituale', recall?.length ? 'orange' : '')}
     </div>
     <div class="group"><h3>Da richiamare</h3><div class="inset">
@@ -218,16 +220,16 @@ addRoute('home', async () => {
     </div></div>
     <div class="group"><h3>Ultimi ordini</h3><div class="inset">
       ${(ordini.data || []).map(o => rowLink(`#/ordine/${o.id}`, o.numero,
-        `${nome(o.client_id)} · ${dmy(o.created_at)}`, `<span class="mono">${eur(o.totale)}</span>${pill(o.stato)}`)).join('')
+        `${nome(o.client_id)} · ${dmy(o.created_at)}`, `<span class="mono">${eur(o.totale)}</span>${pill(o.stato)}`, false)).join('')
         || '<div class="empty">Nessun ordine.</div>'}
     </div></div>`);
 });
 const kpi = (l, v, n, tone = '') =>
   `<div class="kpi"><span class="l">${esc(l)}</span><span class="v mono">${esc(v)}</span>
    <span class="n" ${tone === 'orange' ? 'style="color:var(--orange)"' : ''}>${esc(n)}</span></div>`;
-const rowLink = (href, ttl, sub, right = '') => `<a href="${href}"><div class="row">
-  <span class="av">${esc(ini(ttl))}</span>
-  <span style="flex:1;min-width:0"><span class="ttl">${esc(ttl)}</span><br><span class="sub">${esc(sub)}</span></span>
+const rowLink = (href, ttl, sub, right = '', av = true) => `<a href="${href}"><div class="row">
+  ${av ? `<span class="av">${esc(ini(ttl))}</span>` : ''}
+  <span style="flex:1;min-width:0"><span class="ttl${av ? '' : ' mono'}">${esc(ttl)}</span><br><span class="sub">${esc(sub)}</span></span>
   ${right}${svg('chev', 14, 'chev')}</div></a>`;
 
 /* ---------- Clienti ---------- */
@@ -251,7 +253,7 @@ addRoute('clienti', async () => {
     });
     $('#lista').innerHTML = list.map(c => rowLink(`#/cliente/${c.id}`, c.insegna || c.ragione_sociale,
       [lbl(c.tipologia), c.zona || c.citta].filter(Boolean).join(' · '),
-      `${pill(c.stato)}<span class="pill">${esc(S.agents[c.agent_id]?.nome?.split(' ')[0] || '—')}</span>`)).join('')
+      `<span class="tags">${pill(c.stato)}<span class="pill">${esc(S.agents[c.agent_id]?.nome?.split(' ')[0] || '—')}</span></span>`)).join('')
       || '<div class="empty">Nessun cliente con questi filtri.</div>';
     $('#cnt').textContent = list.length + ' clienti';
   };
@@ -299,8 +301,8 @@ addRoute('cliente', async (id) => {
   };
   const bt = o => (o.order_items || []).reduce((a, r) => a + r.qty, 0);
   paint(`
-    <div class="bar">
-      <a href="#/clienti" class="btn line sm">Clienti</a>
+    <div class="bar acts">
+      <a href="#/clienti" class="btn line sm" aria-label="Clienti">‹<span class="hide-m">&nbsp;Clienti</span></a>
       <span style="flex:1"></span>
       ${ed ? `<button class="btn line sm" id="att">Attività</button>
               <button class="btn line sm" id="mod">Modifica</button>
@@ -513,13 +515,14 @@ addRoute('mappa', async () => {
         <span style="display:inline-block;width:8px;height:8px;border-radius:4px;background:${CrmMap.STATUS[s]};margin-right:5px"></span>
         ${lbl(s)}</button>`).join('')}
       <button class="chip" data-miei>Solo i miei</button></div>
-    <div style="position:relative;height:min(62vh,560px);min-height:320px;border-radius:var(--r);overflow:hidden">
+    <div style="position:relative;isolation:isolate;height:min(62vh,560px);min-height:320px;border-radius:var(--r);overflow:hidden">
       <div id="map"></div></div>
     <div class="group hide" id="sel"></div>
     <div class="sub" id="cnt" style="padding:8px 4px"></div>`);
 
   const M = CrmMap.create($('#map'));
   setTimeout(() => M.map.invalidateSize(), 60);
+  if (window.ResizeObserver) new ResizeObserver(() => M.map.invalidateSize()).observe($('#map'));
 
   const mostra = c => {
     const box = $('#sel'), ag = S.agents[c.agent_id];
@@ -581,6 +584,32 @@ const TIPO_COL = { rosso: '#9B1B30', bianco: '#B8A12A', rosato: '#E07A93', bolli
   macerato: '#D2691E', rifermentato: '#2A9D8F', accessorio: '#8A8A85' };
 const tcol = t => TIPO_COL[t] || '#8A8A85';
 const tipoTag = w => w.tipologia ? `<span class="tipo" style="--tp:${tcol(w.tipologia)}">${esc(w.tipologia)}</span>` : '';
+const nazW = w => w.nazione || 'Altro';
+const ordinaCat = list => [...list].sort((a, b) =>
+  (nazW(a) === 'Italia' ? 0 : 1) - (nazW(b) === 'Italia' ? 0 : 1) || nazW(a).localeCompare(nazW(b), 'it') ||
+  (a.regione || '').localeCompare(b.regione || '', 'it') || (a.produttore || '').localeCompare(b.produttore || '', 'it') ||
+  (a.nome || '').localeCompare(b.nome || '', 'it') || String(a.annata || '').localeCompare(String(b.annata || '')));
+function gruppiCat(list, row) {
+  const cnt = {}; list.forEach(w => { const k = nazW(w) + '|' + (w.regione || '—'); cnt[k] = (cnt[k] || 0) + 1; });
+  let n0 = null, r0 = null;
+  return list.map(w => {
+    const n = nazW(w), r = w.regione || '—'; let h = '';
+    if (n !== n0) { h += `<div class="grp-n">${esc(n)}</div>`; n0 = n; r0 = null; }
+    if (r !== r0) { h += `<div class="grp-h"><span>${esc(r)}</span><span>${cnt[n + '|' + r]}</span></div>`; r0 = r; }
+    return h + row(w);
+  }).join('');
+}
+const zoneOpts = (list, sel) => {
+  const m = {}; list.forEach(w => { (m[nazW(w)] ||= new Set()).add(w.regione || '—'); });
+  return `<option value="">Tutte le zone</option>` + Object.keys(m)
+    .sort((a, b) => (a === 'Italia' ? -1 : b === 'Italia' ? 1 : a.localeCompare(b, 'it')))
+    .map(n => `<optgroup label="${esc(n)}"><option value="N:${esc(n)}" ${sel === 'N:' + n ? 'selected' : ''}>Tutta ${esc(n)}</option>` +
+      [...m[n]].sort((a, b) => a.localeCompare(b, 'it')).map(r =>
+        `<option value="R:${esc(n)}|${esc(r)}" ${sel === `R:${n}|${r}` ? 'selected' : ''}>${esc(r)}</option>`).join('') + '</optgroup>').join('');
+};
+const inZona = (w, z) => !z || (z.startsWith('N:') ? nazW(w) === z.slice(2) : `R:${nazW(w)}|${w.regione || '—'}` === z);
+const nomeVino = w => `<span class="prod">${esc(w.produttore || '—')}</span>
+  <span class="wn">${tipoTag(w)}${esc(w.nome)}${w.annata ? ' <span class="ann">' + esc(w.annata) + '</span>' : ''}</span>`;
 const chipTipo = (t, on) => `<button class="chip ${on ? 'on' : ''}" data-tipo="${t}" style="--tp:${tcol(t)}"><i class="dot"></i>${t}</button>`;
 const CSVCOLS = ['codice', 'produttore', 'nome', 'annata', 'tipologia', 'formato_cl', 'regione', 'nazione',
   'zona_produzione', 'esclusiva', 'vendibile_milano', 'disponibilita', 'prezzo_listino', 'no_sconto',
@@ -631,37 +660,37 @@ addRoute('catalogo', async () => {
   ]);
   if (error) throw error;
   const ST = Object.fromEntries((stock || []).map(s => [s.wine_id, s]));
-  const f = { q: '', tipo: '', set: 'inventario' };
+  const f = { q: '', tipo: '', set: 'inventario', zona: '' };
 
   const disegna = () => {
     const q = f.q.toLowerCase();
-    const list = (wines || []).filter(w => {
+    const list = ordinaCat((wines || []).filter(w => {
       if (f.tipo && w.tipologia !== f.tipo) return false;
+      if (!inZona(w, f.zona)) return false;
       if (f.set === 'inventario' && !w.in_inventario) return false;
       if (f.set === 'fuori' && w.in_inventario) return false;
       if (f.set === 'giacenza' && !w.gestione_giacenza) return false;
       if (!q) return true;
       return [w.produttore, w.nome, w.annata, w.regione, w.zona_produzione, w.vitigni].join(' ').toLowerCase().includes(q);
-    });
+    }));
     $('#cnt').textContent = `${list.length} referenze · ${(wines || []).filter(w => w.in_inventario).length} in inventario`;
-    $('#lista').innerHTML = list.slice(0, 400).map(w => {
+    $('#lista').innerHTML = gruppiCat(list, w => {
       const s = ST[w.id] || {};
       return `<button class="row tp" data-w="${w.id}" style="--tp:${tcol(w.tipologia)}">
         <span style="flex:1;min-width:0">
-          ${tipoTag(w)}<span class="ttl">${esc(w.nome)}${w.annata ? ' <span class="sub">' + esc(w.annata) + '</span>' : ''}</span><br>
-          <span class="sub">${esc([w.produttore, w.formato_cl ? w.formato_cl + ' cl' : null, w.regione].filter(Boolean).join(' · '))}</span>
-          ${w.vitigni ? `<br><span class="sub" style="font-style:italic">${esc(w.vitigni)}</span>` : ''}
-          ${w.no_sconto ? '<span class="pill" style="margin-top:4px;display:inline-block">No sconto</span>' : ''}
-          ${!w.vendibile_milano ? '<span class="pill perso" style="margin-top:4px;display:inline-block">Fuori zona</span>' : ''}
-          ${w.gestione_giacenza ? `<span class="pill" style="margin-top:4px;display:inline-block">Giacenza ${s.disponibile ?? 0}</span>` : ''}
+          ${nomeVino(w)}
+          <span class="sub">${esc([w.formato_cl ? w.formato_cl + ' cl' : null, w.zona_produzione].filter(Boolean).join(' · '))}</span>
+          ${w.vitigni ? `<span class="sub" style="display:block;font-style:italic">${esc(w.vitigni)}</span>` : ''}
+          ${w.no_sconto || !w.vendibile_milano || w.gestione_giacenza ? `<span class="tags" style="margin-top:4px">
+            ${w.no_sconto ? '<span class="pill">No sconto</span>' : ''}
+            ${!w.vendibile_milano ? '<span class="pill perso">Fuori zona</span>' : ''}
+            ${w.gestione_giacenza ? `<span class="pill">Giacenza ${s.disponibile ?? 0}</span>` : ''}</span>` : ''}
         </span>
-        <span class="mono">${eur(w.prezzo_listino)}</span>
-        ${pill(w.disponibilita)}
-        <span class="pill ${w.in_inventario ? 'attivo' : ''}">${w.in_inventario ? 'In inventario' : 'Escluso'}</span>
+        <span class="meta"><span class="mono" style="font-weight:600">${eur(w.prezzo_listino)}</span>
+          ${pill(w.disponibilita)}
+          ${f.set === 'inventario' ? '' : `<span class="pill ${w.in_inventario ? 'attivo' : ''}">${w.in_inventario ? 'In inventario' : 'Escluso'}</span>`}</span>
       </button>`;
-    }).join('') || '<div class="empty">Nessuna referenza con questi filtri.</div>';
-    if (list.length > 400) $('#lista').insertAdjacentHTML('beforeend',
-      '<div class="empty">Mostrate le prime 400: restringi la ricerca.</div>');
+    }) || '<div class="empty">Nessuna referenza con questi filtri.</div>';
   };
 
   paint(`<div class="bar"><h1>Catalogo</h1><span style="flex:1"></span>
@@ -674,10 +703,12 @@ addRoute('catalogo', async () => {
         .map(([k, l]) => `<button data-set="${k}" class="${f.set === k ? 'on' : ''}">${l}</button>`).join('')}</div>
     <div class="chips" style="margin-bottom:10px" id="tipi">
       ${TIPI.map(t => chipTipo(t, false)).join('')}</div>
+    <select id="zona" class="zona" aria-label="Filtra per zona">${zoneOpts(wines || [], '')}</select>
     <div class="sub" id="cnt" style="padding:2px 4px 8px"></div>
     <div class="inset" id="lista"></div>`);
 
   $('#q').addEventListener('input', e => { f.q = e.target.value; disegna(); });
+  $('#zona').addEventListener('change', e => { f.zona = e.target.value; disegna(); });
   $('.seg').addEventListener('click', e => {
     const b = e.target.closest('[data-set]'); if (!b) return;
     f.set = b.dataset.set;
@@ -772,7 +803,7 @@ function schedaVino(w, s, done) {
 }
 
 /* ---------- Ordini ---------- */
-const STATI_ORD = [['', 'Tutti'], ['bozza', 'Bozze'], ['inviato', 'Inviati'], ['confermato', 'Confermati'], ['evaso', 'Evasi']];
+const STATI_ORD = [['', 'Tutti'], ['bozza', 'Bozze'], ['inviato', 'Inviati'], ['confermato', 'Confermati'], ['evaso', 'Evasi'], ['annullato', 'Annullati']];
 const nomeCli = id => { const c = S.clients.find(x => x.id === id); return c ? (c.insegna || c.ragione_sociale) : '—'; };
 
 function pickCliente(cb) {
@@ -813,7 +844,7 @@ addRoute('ordini', async () => {
         ${o.scade_at ? ' · scade ' + dmy(o.scade_at) : ''}</span></span>
       <span class="mono">${eur(o.totale)}</span>${pill(o.stato)}${svg('chev', 14, 'chev')}</div></a>`).join('')
       || '<div class="empty">Nessun ordine.</div>';
-    $('#cnt').textContent = `${list.length} ordini · ${eur(list.reduce((a, o) => a + num(o.totale), 0))}`;
+    $('#cnt').textContent = `${list.length} ${list.length === 1 ? 'ordine' : 'ordini'} · ${eur(list.reduce((a, o) => a + num(o.totale), 0))}`;
   };
   paint(`<div class="bar"><h1>Ordini</h1><span style="flex:1"></span>
       <button class="btn sm" id="new">${svg('piu', 16)} Nuovo</button></div>
@@ -854,12 +885,12 @@ addRoute('ordine', async (id, extra) => {
   if (error) throw error;
   const cli = S.clients.find(c => c.id === o.client_id) || {};
   const ST = Object.fromEntries((stock || []).map(s => [s.wine_id, s]));
-  const catalogo = (ws || []).filter(w => ST[w.id]?.vendibile);
+  const catalogo = ordinaCat((ws || []).filter(w => ST[w.id]?.vendibile));
   const items = new Map((rows || []).map(i => [i.wine_id, i]));
   const editabile = o.stato === 'bozza' && (isAdmin() || o.agent_id === S.me.id);
   const boss = isAdmin() || isViewer();
   const passo = () => 1; // singola bottiglia per click, sempre (nessun vincolo di cartone)
-  const f = { q: '', tipo: '', sconto: num(o.sconto_cliente_pct ?? cli.sconto_concordato_pct ?? 0) };
+  const f = { q: '', tipo: '', zona: '', primo: true, sconto: num(o.sconto_cliente_pct ?? cli.sconto_concordato_pct ?? 0) };
   const noSc = w => w.no_sconto || w.disponibilita === 'assegnazione';
   const netto = (w, it) => (it.qty - (it.qty_omaggio || 0)) * num(it.prezzo_unitario ?? w.prezzo_listino) * (1 - num(it.sconto_pct) / 100);
 
@@ -917,9 +948,8 @@ addRoute('ordine', async (id, extra) => {
     const tono = w.gestione_giacenza && s.disponibile <= 12 ? 'var(--orange)' : 'var(--fg2)';
     return `<div class="row tp" style="--tp:${tcol(w.tipologia)};${q ? 'background:var(--accent-tint)' : ''}">
       <span style="flex:1;min-width:0">
-        ${tipoTag(w)}<span class="ttl" style="font-size:15px">${esc(w.nome)}${w.annata ? ' ' + esc(w.annata) : ''}</span><br>
-        <span class="sub">${esc([w.produttore, w.formato_cl ? w.formato_cl + ' cl' : null, w.regione].filter(Boolean).join(' · '))}</span><br>
-        ${w.vitigni ? `<span class="sub" style="font-style:italic">${esc(w.vitigni)}</span><br>` : ''}
+        ${nomeVino(w)}
+        <span class="sub">${esc([w.formato_cl ? w.formato_cl + ' cl' : null, w.vitigni].filter(Boolean).join(' · '))}</span><br>
         <span class="sub mono" style="font-weight:600">${eur(w.prezzo_listino)}
           <span style="color:${tono}">· ${esc(disp)}</span>
           ${w.no_sconto || w.disponibilita === 'assegnazione' ? '· no sconto' : ''}</span></span>
@@ -939,6 +969,7 @@ addRoute('ordine', async (id, extra) => {
     return `<div class="cart-item tp" style="--tp:${tcol(w.tipologia)}">
       <div class="cart-row">
         <span style="flex:1;min-width:0">
+          <span class="prod" style="font-size:11.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(w.produttore || '')}</span>
           <span class="ttl" style="font-size:14px;display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(w.nome)}${w.annata ? ' ' + esc(w.annata) : ''}</span>
           <span class="sub mono">${net < lordo - 0.004 ? `<s>${eur(lordo)}</s> ` : ''}<b>${eur(net)}</b>${info ? ` <span style="color:var(--green)">${info}</span>` : ''}</span></span>
         ${editabile ? `<span class="step">
@@ -948,8 +979,8 @@ addRoute('ordine', async (id, extra) => {
           : `<span class="mono">${q} bt</span>`}
       </div>
       ${editabile ? `<div class="cart-opts">
-        <label>Sconto <input type="number" min="0" max="100" step="0.5" inputmode="decimal" data-rsc="${w.id}" value="${sc}" ${bloccato ? 'disabled title="Referenza non scontabile"' : ''}> %</label>
-        <label>Omaggio <input type="number" min="0" max="${q}" step="1" inputmode="numeric" data-rom="${w.id}" value="${om}" ${bloccato ? 'disabled' : ''}> bt</label>
+        <label>Sconto <input class="num-in" type="number" min="0" max="100" step="0.5" inputmode="decimal" data-rsc="${w.id}" value="${sc}" ${bloccato ? 'disabled title="Referenza non scontabile"' : ''}> %</label>
+        <label>Omaggio <input class="num-in" type="number" min="0" max="${q}" step="1" inputmode="numeric" data-rom="${w.id}" value="${om}" ${bloccato ? 'disabled' : ''}> bt</label>
       </div>` : ''}
     </div>`;
   };
@@ -958,7 +989,7 @@ addRoute('ordine', async (id, extra) => {
     const scelti = catalogo.filter(w => items.has(w.id));
     const q = f.q.toLowerCase();
     const filtrati = editabile ? catalogo.filter(w =>
-      (!f.tipo || w.tipologia === f.tipo) &&
+      (!f.tipo || w.tipologia === f.tipo) && inZona(w, f.zona) &&
       (!q || [w.produttore, w.nome, w.annata, w.regione, w.vitigni].join(' ').toLowerCase().includes(q))) : [];
     const bt = [...items.values()].reduce((a, i) => a + i.qty, 0);
     const lordoTot = scelti.reduce((a, w) => { const it = items.get(w.id); return a + it.qty * num(it.prezzo_unitario ?? w.prezzo_listino); }, 0);
@@ -968,14 +999,16 @@ addRoute('ordine', async (id, extra) => {
     if (isAdmin() && o.stato === 'inviato') azioni.push(['confermato', 'Conferma', 'btn'], ['annullato', 'Annulla', 'btn ghost']);
     if (isAdmin() && o.stato === 'confermato') azioni.push(['evaso', 'Segna evaso', 'btn']);
 
+    const y0 = f.primo ? 0 : window.scrollY, cy0 = $('.ord-cart')?.scrollTop || 0;
+    f.primo = false;
     paint(`<div class="ord-layout">
       <div class="ord-header">
-        <div class="bar"><a href="#/ordini" class="btn line sm">Ordini</a><span style="flex:1"></span>
+        <div class="bar acts"><a href="#/ordini" class="btn line sm" aria-label="Ordini">‹<span class="hide-m">&nbsp;Ordini</span></a><span style="flex:1"></span>
           <button class="btn line sm" id="dup">Duplica</button>
           ${o.stato === 'bozza' && (isAdmin() || o.agent_id === S.me.id) ? '<button class="btn line sm" id="delOrd" style="color:var(--red)">Elimina</button>' : ''}
-          <button class="btn line sm" id="mailOrd">✉️ Email</button>
-          <button class="btn line sm" id="waOrd">WhatsApp</button>${pill(o.stato)}</div>
-        <h1 class="mono" style="font-size:22px">${esc(o.numero)}</h1>
+          <button class="btn line sm" id="mailOrd" aria-label="Email">${svg('mail', 16)}<span class="hide-m">&nbsp;Email</span></button>
+          <button class="btn line sm" id="waOrd" aria-label="WhatsApp">${svg('chat', 16)}<span class="hide-m">&nbsp;WhatsApp</span></button></div>
+        <h1 class="mono" style="font-size:22px;display:flex;align-items:center;gap:10px">${esc(o.numero)} ${pill(o.stato)}</h1>
         <div class="inset" style="margin-top:12px">
           <a href="#/cliente/${cli.id}"><div class="row">
             <span class="av">${esc(ini(cli.insegna || cli.ragione_sociale || '?'))}</span>
@@ -989,7 +1022,7 @@ addRoute('ordine', async (id, extra) => {
             </select></div>
           <div class="row"><label for="scontoCli">Sconto cliente</label>
             ${editabile
-              ? `<input id="scontoCli" type="number" min="0" max="100" step="0.5" inputmode="decimal" style="text-align:right;width:64px" value="${f.sconto || 0}"> %`
+              ? `<input id="scontoCli" type="number" min="0" max="100" step="0.5" inputmode="decimal" class="num-in" value="${f.sconto || 0}"> %`
               : `<span class="v mono">${f.sconto ? f.sconto + '%' : '—'}</span>`}</div>
           ${o.scade_at ? kv('Prenotazione valida fino al', dmy(o.scade_at)) : ''}
         </div>
@@ -1001,10 +1034,11 @@ addRoute('ordine', async (id, extra) => {
             <input id="cq" type="search" placeholder="Produttore, vino, regione" value="${esc(f.q)}"></div>
           <div class="chips" style="margin:8px 0" id="tipi">
             ${TIPI.filter(t => t !== 'accessorio').map(t => chipTipo(t, f.tipo === t)).join('')}</div>
-          <div class="inset">${filtrati.slice(0, 80).map(rigaVino).join('') || '<div class="empty">Nessuna referenza.</div>'}
-          ${filtrati.length > 80 ? '<div class="empty">Mostrate le prime 80: affina la ricerca.</div>' : ''}</div>
+          <select id="zona" class="zona" aria-label="Filtra per zona">${zoneOpts(catalogo, f.zona)}</select>
+          <div class="sub" style="padding:2px 4px 8px">${filtrati.length} referenze</div>
+          <div class="inset">${gruppiCat(filtrati, rigaVino) || '<div class="empty">Nessuna referenza.</div>'}</div>
         </div>` : `<div class="group" style="margin-top:0"><h3>Referenze</h3><div class="inset">
-          ${scelti.map(rigaVino).join('') || '<div class="empty">Nessuna referenza.</div>'}
+          ${gruppiCat(scelti, rigaVino) || '<div class="empty">Nessuna referenza.</div>'}
         </div></div>`}
       </div>
 
@@ -1024,11 +1058,14 @@ addRoute('ordine', async (id, extra) => {
       </aside>
     </div>
     ${azioni.length ? `<div class="sheet hide-desktop">
-      <span style="flex:1"><span class="sub">${bt} bt · ${items.size} referenze</span><br>
+      <span style="flex:1"><span class="sub">${bt} bt · ${items.size} ${items.size === 1 ? 'referenza' : 'referenze'}</span><br>
         <span class="mono" style="font-size:20px;font-weight:700">${eur(o.totale)}</span></span>
       <button class="${azioni[0][2]}" data-go="${azioni[0][0]}">${azioni[0][1]}</button>
     </div>` : ''}`);
 
+    window.scrollTo(0, y0); const oc = $('.ord-cart'); if (oc) oc.scrollTop = cy0;
+    const zs = $('#zona');
+    if (zs) zs.addEventListener('change', e => { f.zona = e.target.value; render(); });
     $('#pag').addEventListener('change', e => go(async () => {
       const r = await sb.from('orders').update({ pagamento: e.target.value }).eq('id', o.id).select().single();
       if (r.error) throw r.error;

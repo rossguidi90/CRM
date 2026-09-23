@@ -175,6 +175,38 @@ h3{font-size:12px;font-weight:700;color:var(--fg2);text-transform:uppercase;lett
 .chip.on{background:var(--tp,var(--accent));border-color:var(--tp,var(--accent))}.chip.on .dot{background:#fff}
 .cart-empty{padding:20px 14px;text-align:center;color:var(--fg2);font-size:14px}
 @media (min-width:1024px){.hide-desktop{display:none!important}}
+@media (max-width:719px){.hide-m{display:none!important}}
+.inset{overflow:clip}
+.grp-n{padding:12px 14px 6px;font-size:13px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--fg);
+  background:var(--card);border-top:1px solid var(--sep)}
+.grp-h{position:sticky;top:0;z-index:2;display:flex;justify-content:space-between;padding:6px 14px;background:var(--fill);
+  font-size:11.5px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--fg2);border-top:1px solid var(--sep)}
+.prod{display:block;font-size:13px;font-weight:800;letter-spacing:.03em;text-transform:uppercase;color:var(--fg)}
+.wn{display:block;font-size:15px;font-weight:500;color:var(--fg);margin:1px 0 2px}
+.wn .ann{color:var(--fg2);font-weight:400}
+.wn .tipo{vertical-align:1px}
+.tags{display:inline-flex;gap:6px;align-items:center;flex-wrap:wrap;flex-shrink:0}
+.meta{display:flex;align-items:center;gap:8px;flex-shrink:0}
+.ttl.mono{white-space:nowrap}
+.seg button{white-space:nowrap;padding:0 6px}
+.zona{width:100%;min-height:38px;margin:0 0 8px;padding:0 10px;border:1px solid var(--border);border-radius:4px;background:var(--card);font-size:14px}
+.num-in,.row input.num-in{flex:0 0 auto;width:60px;min-height:32px;padding:2px 8px;text-align:right;font-size:14px;
+  border:1px solid var(--border);border-radius:4px;background:var(--card)}
+.cart-opts .num-in{width:52px;min-height:30px;font-size:13px}
+.bar.acts .btn{display:inline-flex;align-items:center;justify-content:center}
+#tabbar{grid-template-columns:repeat(6,1fr)}
+@media (max-width:719px){
+  .bar.acts{flex-wrap:nowrap}
+  .bar.acts>*{flex-shrink:0}
+  .seg button{font-size:12px}
+  .tags{flex-direction:column;align-items:flex-end;gap:4px}
+  .row .tags[style]{flex-direction:row;align-items:center}
+  .meta{flex-direction:column;align-items:flex-end;gap:4px}
+}
+@media (max-width:1023px){
+  .sheet{bottom:calc(var(--tab) + env(safe-area-inset-bottom));padding-bottom:12px}
+  .ord-layout{padding-bottom:78px}
+}
 
 </style>
 </head>
@@ -196,7 +228,7 @@ window.WA_CONFIG = {
 <script src="crm_map.js?v=5"></script>
 <script src="crm_insights.js?v=5"></script>
 <script src="crm_client_form.js?v=6"></script>
-<script src="crm.js?v=9"></script>
+<script src="crm.js?v=10"></script>
 <script>
 // Diagnostica: se dopo 9 secondi l'app non è partita, dice cosa manca invece di girare a vuoto.
 (function () {
