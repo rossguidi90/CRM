@@ -1,699 +1,176 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="it">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>CRM Vendita — Wine Alchemist</title>
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#F2F2F7">
+<title>Wine Alchemist CRM</title>
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="WA CRM">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
 <style>
 :root{
-  --bg:#f5f5f7; --card:#ffffff; --text:#1d1d1f; --sub:#6e6e73;
-  --accent:#7b2d26; --accent-light:#a94438; --border:#e5e5ea;
-  --danger:#d9453d; --success:#2fa84f; --radius:14px;
-  --shadow:0 1px 3px rgba(0,0,0,.06), 0 4px 14px rgba(0,0,0,.04);
+  --bg:#F2F2F7; --card:#FFFFFF; --card2:#F7F7F9; --side:#F5F5F7;
+  --fg:#1C1C1E; --fg2:#6C6C70; --fg3:#8E8E93; --sep:#E5E5EA; --border:#D1D1D6;
+  --accent:#7A1F2B; --accent-tint:#F4E9EB; --fill:#EFEFF3;
+  --green:#1F7A35; --green-t:#E3F4E7; --orange:#9A4A00; --orange-t:#FFF0DC;
+  --blue:#0058B0; --blue-t:#E3EFFC; --purple:#4B49B8; --purple-t:#ECEBFB;
+  --red:#B3261E; --red-t:#FCE6E4; --gold:#7A5A1E; --gold-t:#F3EBDD; --grey-t:#EDEDF0;
+  --r:14px; --tab:84px;
+  --font:-apple-system,BlinkMacSystemFont,"SF Pro Text","Helvetica Neue",sans-serif;
 }
-*{box-sizing:border-box}
-body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI",Roboto,sans-serif;background:var(--bg);color:var(--text);-webkit-font-smoothing:antialiased}
-button{font-family:inherit;cursor:pointer;border:none;border-radius:10px;padding:10px 16px;font-size:14px;font-weight:600;transition:.15s}
-input,select,textarea{font-family:inherit;border:1px solid var(--border);border-radius:10px;padding:10px 12px;font-size:14px;background:#fff;width:100%;color:var(--text)}
-input:focus,select:focus,textarea:focus{outline:2px solid var(--accent-light);outline-offset:1px}
-.btn-primary{background:var(--accent);color:#fff}
-.btn-primary:hover{background:var(--accent-light)}
-.btn-secondary{background:#eceef0;color:var(--text)}
-.btn-secondary:hover{background:#e0e2e5}
-.btn-danger{background:#fdeceb;color:var(--danger)}
-.hidden{display:none !important}
+@media (prefers-color-scheme:dark){:root{
+  --bg:#000000; --card:#1C1C1E; --card2:#121214; --side:#151517;
+  --fg:#F2F2F7; --fg2:#98989F; --fg3:#8E8E93; --sep:#2C2C2E; --border:#3A3A3C;
+  --accent:#D98A96; --accent-tint:#2A1216; --fill:#2C2C2E;
+  --green:#5CD07A; --green-t:#14301B; --orange:#F0A23C; --orange-t:#33220A;
+  --blue:#6BB6FF; --blue-t:#0C2440; --purple:#A9A7FF; --purple-t:#1D1C3A;
+  --red:#FF8A80; --red-t:#3A1512; --gold:#D9B96A; --gold-t:#2E2513; --grey-t:#2C2C2E;
+}}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;padding:0;height:100%}
+body{background:var(--bg);color:var(--fg);font:16px/1.35 var(--font);-webkit-font-smoothing:antialiased;overscroll-behavior-y:none}
+button,input,select,textarea{font:inherit;color:inherit}
+button{cursor:pointer}
+a{color:var(--accent);text-decoration:none}
+h1,h2,h3{margin:0;letter-spacing:-.02em}
+h1{font-size:30px;font-weight:700}
+h2{font-size:20px;font-weight:700}
+h3{font-size:13px;font-weight:600;color:var(--fg2);text-transform:uppercase;letter-spacing:.03em}
+.hide{display:none!important}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+.mono{font-variant-numeric:tabular-nums}
 
-/* LOGIN */
-#login-view{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px}
-.login-box{background:var(--card);padding:40px 32px;border-radius:var(--radius);box-shadow:var(--shadow);width:100%;max-width:360px}
-.login-box h1{font-size:22px;margin:0 0 4px;text-align:center}
-.login-box p.sub{color:var(--sub);text-align:center;margin:0 0 24px;font-size:14px}
-.login-box label{font-size:13px;font-weight:600;color:var(--sub);display:block;margin:14px 0 6px}
-.login-box button{width:100%;margin-top:20px;padding:12px}
-.err{color:var(--danger);font-size:13px;margin-top:10px;text-align:center}
-.toggle-link{text-align:center;margin-top:16px;font-size:13px;color:var(--accent);cursor:pointer}
+/* ---------- layout ---------- */
+#app{min-height:100%;display:flex;flex-direction:column}
+#side{display:none}
+#main{flex:1;min-width:0;padding:max(16px,env(safe-area-inset-top)) 16px calc(var(--tab) + 20px) 16px}
+#tabbar{position:fixed;left:0;right:0;bottom:0;height:calc(var(--tab) + env(safe-area-inset-bottom));
+  padding-bottom:env(safe-area-inset-bottom);background:color-mix(in srgb,var(--card) 94%,transparent);
+  backdrop-filter:saturate(180%) blur(20px);border-top:1px solid var(--border);
+  display:grid;grid-template-columns:repeat(5,1fr);align-items:start;padding-top:6px;z-index:40}
+#tabbar a{display:flex;flex-direction:column;align-items:center;gap:3px;min-height:44px;font-size:10px;font-weight:600;color:var(--fg3)}
+#tabbar a.on{color:var(--accent)}
+@media (min-width:1024px){
+  #app{flex-direction:row}
+  #side{display:flex;flex-direction:column;gap:22px;width:232px;flex-shrink:0;background:var(--side);
+    border-right:1px solid var(--border);padding:26px 12px 16px;position:sticky;top:0;height:100vh}
+  #main{padding:26px 28px 40px;max-width:1400px}
+  #tabbar{display:none}
+}
+#side .brand{padding:0 10px;font-family:Georgia,"Times New Roman",serif;font-size:23px;color:var(--accent)}
+#side nav{display:flex;flex-direction:column;gap:2px}
+#side nav a{display:flex;align-items:center;gap:10px;min-height:36px;padding:0 10px;border-radius:8px;
+  font-size:14px;font-weight:500;color:var(--fg)}
+#side nav a.on{background:var(--accent);color:#fff}
+#side nav a .n{margin-left:auto;font-size:12px;color:var(--fg2)}
+#side nav a.on .n{color:#fff}
+#side .me{margin-top:auto;display:flex;align-items:center;gap:10px;padding:8px 10px}
 
-/* APP SHELL */
-#app-view{display:none;min-height:100vh}
-header.topbar{background:var(--card);border-bottom:1px solid var(--border);padding:14px 24px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:50}
-header.topbar .brand{font-weight:700;font-size:17px}
-header.topbar .brand span{color:var(--accent)}
-.user-chip{display:flex;align-items:center;gap:10px;font-size:13px;color:var(--sub)}
-nav.tabs{display:flex;gap:4px;background:var(--card);padding:6px;margin:16px 24px 0;border-radius:12px;box-shadow:var(--shadow);width:fit-content;overflow-x:auto}
-nav.tabs button{background:transparent;color:var(--sub);padding:8px 16px;border-radius:8px;font-size:14px}
-nav.tabs button.active{background:var(--accent);color:#fff}
-main{padding:20px 24px 60px;max-width:1200px;margin:0 auto}
-.view{display:none}
-.view.active{display:block}
-.card{background:var(--card);border-radius:var(--radius);box-shadow:var(--shadow);padding:20px}
-.section-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:10px}
-.section-head h2{margin:0;font-size:20px}
-.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:14px}
-.list-item{background:var(--card);border-radius:var(--radius);box-shadow:var(--shadow);padding:16px;cursor:pointer;transition:.15s}
-.list-item:hover{transform:translateY(-2px);box-shadow:0 4px 20px rgba(0,0,0,.08)}
-.list-item h3{margin:0 0 4px;font-size:16px}
-.list-item .meta{color:var(--sub);font-size:13px;margin:2px 0}
-.badge{display:inline-block;font-size:11px;font-weight:700;padding:3px 8px;border-radius:6px;text-transform:uppercase;letter-spacing:.3px}
-.badge.attivo{background:#e6f7ea;color:var(--success)}
-.badge.prospect{background:#fff4e0;color:#b8790a}
-.badge.inattivo{background:#f0f0f2;color:var(--sub)}
-.search-bar{display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap}
-.search-bar input{flex:1;min-width:200px}
-.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.4);display:flex;align-items:center;justify-content:center;z-index:100;padding:20px}
-.modal{background:var(--card);border-radius:var(--radius);max-width:560px;width:100%;max-height:88vh;overflow-y:auto;padding:24px}
-.modal h2{margin-top:0}
-.form-row{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px}
-.form-row.full{grid-template-columns:1fr}
-.modal-actions{display:flex;justify-content:flex-end;gap:10px;margin-top:20px}
-#map{height:200px;border-radius:10px;margin-top:10px;background:#eee}
-.tag-title{font-size:12px;font-weight:700;color:var(--sub);text-transform:uppercase;letter-spacing:.4px;margin:18px 0 8px}
-.tag-title:first-child{margin-top:0}
-.wine-pick{display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--border)}
-.wine-pick:last-child{border-bottom:none}
-.wine-pick .qty{width:70px}
-.order-line{display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border);font-size:14px}
-.total-row{display:flex;justify-content:space-between;font-weight:700;font-size:16px;padding-top:10px}
-.empty-state{text-align:center;color:var(--sub);padding:40px 20px}
-.stat-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:14px;margin-bottom:20px}
-.stat-card{background:var(--card);border-radius:var(--radius);box-shadow:var(--shadow);padding:18px}
-.stat-card .num{font-size:26px;font-weight:700}
-.stat-card .lbl{color:var(--sub);font-size:13px;margin-top:2px}
-table{width:100%;border-collapse:collapse;font-size:14px}
-th,td{text-align:left;padding:10px 8px;border-bottom:1px solid var(--border)}
-th{color:var(--sub);font-weight:600;font-size:12px;text-transform:uppercase}
-.spinner{width:18px;height:18px;border:2px solid #ddd;border-top-color:var(--accent);border-radius:50%;animation:spin .7s linear infinite;display:inline-block}
-@keyframes spin{to{transform:rotate(360deg)}}
-.toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:#1d1d1f;color:#fff;padding:12px 20px;border-radius:10px;font-size:14px;z-index:200;box-shadow:var(--shadow)}
-@media(max-width:600px){.form-row{grid-template-columns:1fr}main{padding:14px}header.topbar{padding:12px 16px}nav.tabs{margin:12px 16px 0}}
+/* ---------- componenti iOS ---------- */
+.group{display:flex;flex-direction:column;gap:6px;margin:18px 0}
+.group>h3{padding:0 16px}
+.inset{background:var(--card);border-radius:var(--r);overflow:hidden}
+.row{display:flex;align-items:center;gap:12px;min-height:46px;padding:9px 14px;border-top:1px solid var(--sep);
+  background:none;border-left:0;border-right:0;border-bottom:0;width:100%;text-align:left;color:inherit}
+.inset>.row:first-child,.inset>a:first-child .row,.inset>*:first-child{border-top:0}
+.row.col{flex-direction:column;align-items:stretch;gap:6px}
+.row label{color:var(--fg2);font-size:15px;flex-shrink:0}
+.row input,.row select,.row textarea{flex:1;min-width:0;border:0;background:transparent;outline:none;text-align:right}
+.row.col input,.row.col select,.row.col textarea{text-align:left;background:var(--fill);border-radius:10px;padding:9px 11px}
+.row textarea{resize:vertical}
+.row .v{margin-left:auto;color:var(--fg2);text-align:right}
+.row.danger{color:var(--red);justify-content:center;font-weight:500}
+.ttl{font-size:16px;font-weight:600}
+.sub{font-size:13px;color:var(--fg2)}
+.chev{width:14px;height:14px;flex-shrink:0;color:var(--fg3)}
+.av{width:38px;height:38px;flex-shrink:0;border-radius:11px;background:var(--accent-tint);color:var(--accent);
+  display:flex;align-items:center;justify-content:center;font-weight:700;font-size:13px}
+.av.round{border-radius:50%;background:var(--fill);color:var(--fg)}
+.pill{font-size:12px;font-weight:600;padding:3px 8px;border-radius:8px;white-space:nowrap;background:var(--grey-t);color:var(--fg2)}
+.pill.attivo,.pill.ok,.pill.evaso,.pill.confermato{background:var(--green-t);color:var(--green)}
+.pill.trattativa,.pill.riordina,.pill.inviato,.pill.limitato,.pill.in_esaurimento{background:var(--orange-t);color:var(--orange)}
+.pill.contattato,.pill.assegnazione{background:var(--blue-t);color:var(--blue)}
+.pill.visitato,.pill.su_prenotazione{background:var(--purple-t);color:var(--purple)}
+.pill.perso,.pill.annullato,.pill.esaurito{background:var(--red-t);color:var(--red)}
+.pill.dormiente,.pill.in_arrivo{background:var(--gold-t);color:var(--gold)}
+.btn{border:0;border-radius:12px;min-height:46px;padding:0 18px;background:var(--accent);color:#fff;font-size:16px;font-weight:600;
+  display:inline-flex;align-items:center;justify-content:center;gap:8px}
+.btn.ghost{background:var(--fill);color:var(--accent)}
+.btn.line{background:transparent;border:1px solid var(--border);color:var(--fg)}
+.btn.sm{min-height:34px;font-size:14px;border-radius:9px;padding:0 13px}
+.btn[disabled]{opacity:.45;pointer-events:none}
+.seg{display:grid;grid-auto-flow:column;grid-auto-columns:1fr;gap:2px;background:var(--fill);border-radius:9px;padding:2px}
+.seg button{border:0;border-radius:7px;min-height:32px;background:transparent;font-size:13px;font-weight:600;color:var(--fg)}
+.seg button.on{background:var(--card);box-shadow:0 1px 3px rgba(0,0,0,.14)}
+.search{display:flex;align-items:center;gap:8px;background:var(--fill);border-radius:10px;padding:0 10px;height:40px}
+.search input{flex:1;border:0;background:transparent;outline:none}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{border:0;border-radius:15px;min-height:30px;padding:0 11px;font-size:13px;font-weight:500;background:var(--fill);color:var(--fg2)}
+.chip.on{background:var(--accent-tint);color:var(--accent)}
+.kpis{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+@media (min-width:1024px){.kpis{grid-template-columns:repeat(4,minmax(0,1fr))}}
+.kpi{background:var(--card);border-radius:var(--r);padding:14px 16px;display:flex;flex-direction:column;gap:3px}
+.kpi .l{font-size:13px;color:var(--fg2);font-weight:500}
+.kpi .v{font-size:26px;font-weight:700;letter-spacing:-.02em}
+.kpi .n{font-size:12px;font-weight:600;color:var(--fg2)}
+.grid2{display:grid;gap:14px}
+@media (min-width:1024px){.grid2{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.card{background:var(--card);border-radius:var(--r);padding:16px}
+.bar{display:flex;align-items:center;gap:10px;margin-bottom:14px}
+.bar h1{flex:1;min-width:0}
+.step{display:flex;align-items:center;background:var(--fill);border-radius:10px}
+.step button{width:38px;height:44px;border:0;background:none;color:var(--accent);font-size:20px;line-height:1}
+.step button[disabled]{color:var(--fg3);opacity:1}
+.step .q{min-width:26px;text-align:center;font-weight:600;font-variant-numeric:tabular-nums}
+.sheet{position:fixed;left:0;right:0;bottom:0;padding:12px 16px calc(14px + env(safe-area-inset-bottom));
+  background:color-mix(in srgb,var(--card) 96%,transparent);backdrop-filter:blur(20px);
+  border-top:1px solid var(--border);display:flex;align-items:center;gap:12px;z-index:45}
+.modal{position:fixed;inset:0;background:rgba(0,0,0,.4);display:flex;align-items:flex-end;justify-content:center;z-index:60}
+.modal>div{background:var(--bg);width:100%;max-width:620px;max-height:92vh;overflow:auto;
+  border-radius:18px 18px 0 0;padding:18px 16px calc(24px + env(safe-area-inset-bottom))}
+@media (min-width:720px){.modal{align-items:center}.modal>div{border-radius:18px;max-height:88vh}}
+.empty{padding:34px 16px;text-align:center;color:var(--fg2)}
+.spin{width:22px;height:22px;border:2px solid var(--border);border-top-color:var(--accent);border-radius:50%;
+  animation:sp .7s linear infinite;margin:32px auto}
+@keyframes sp{to{transform:rotate(360deg)}}
+#toast{position:fixed;left:50%;bottom:calc(var(--tab) + 22px);transform:translateX(-50%);z-index:80;
+  background:var(--fg);color:var(--bg);padding:11px 16px;border-radius:12px;font-size:14px;font-weight:500;
+  max-width:88vw;box-shadow:0 6px 22px rgba(0,0,0,.25)}
+#login{min-height:100%;display:flex;align-items:center;justify-content:center;padding:24px}
+#login form{width:100%;max-width:360px;display:flex;flex-direction:column;gap:14px}
+#login .brand{font-family:Georgia,serif;font-size:30px;color:var(--accent);text-align:center;margin-bottom:6px}
+.leaflet-tile-pane{filter:grayscale(1) contrast(.92) brightness(1.04)}
+@media (prefers-color-scheme:dark){.leaflet-tile-pane{filter:grayscale(1) invert(1) contrast(.85) brightness(.85)}}
+#map{position:absolute;inset:0}
 </style>
 </head>
 <body>
+<div id="root"><div class="spin"></div></div>
 
-<!-- LOGIN -->
-<div id="login-view">
-  <div class="login-box">
-    <h1>🍷 CRM Vendita</h1>
-    <p class="sub">Wine Alchemist — rete agenti Milano</p>
-    <form id="login-form">
-      <label>Email</label>
-      <input type="email" id="login-email" required autocomplete="username">
-      <label>Password</label>
-      <input type="password" id="login-password" required autocomplete="current-password">
-      <button type="submit" class="btn-primary" id="login-btn">Accedi</button>
-      <div class="err hidden" id="login-err"></div>
-    </form>
-    <div class="toggle-link" id="toggle-signup">Non hai un account? Registrati</div>
-    <div class="toggle-link" id="forgot-password">Password dimenticata?</div>
-  </div>
-</div>
-
-<!-- APP -->
-<div id="app-view">
-  <header class="topbar">
-    <div class="brand">🍷 CRM <span>Wine Alchemist</span></div>
-    <div class="user-chip">
-      <span id="agente-nome"></span>
-      <button class="btn-secondary" id="logout-btn">Esci</button>
-    </div>
-  </header>
-
-  <nav class="tabs">
-    <button data-view="clienti" class="active">Clienti</button>
-    <button data-view="catalogo">Catalogo</button>
-    <button data-view="ordini">Ordini</button>
-    <button data-view="analisi">Analisi</button>
-  </nav>
-
-  <main>
-    <!-- CLIENTI -->
-    <div class="view active" id="view-clienti">
-      <div class="section-head">
-        <h2>Clienti</h2>
-        <button class="btn-primary" id="new-cliente-btn">+ Nuovo cliente</button>
-      </div>
-      <div class="search-bar">
-        <input type="text" id="cliente-search" placeholder="Cerca per nome, città, agente...">
-        <select id="cliente-filter-stato">
-          <option value="">Tutti gli stati</option>
-          <option value="attivo">Attivo</option>
-          <option value="prospect">Prospect</option>
-          <option value="inattivo">Inattivo</option>
-        </select>
-      </div>
-      <div class="grid" id="clienti-list"></div>
-    </div>
-
-    <!-- CATALOGO -->
-    <div class="view" id="view-catalogo">
-      <div class="section-head">
-        <h2>Catalogo vini</h2>
-        <button class="btn-primary" id="new-vino-btn">+ Nuova referenza</button>
-      </div>
-      <div class="search-bar">
-        <input type="text" id="vino-search" placeholder="Cerca per nome, produttore, tipologia...">
-      </div>
-      <div class="grid" id="vini-list"></div>
-    </div>
-
-    <!-- ORDINI -->
-    <div class="view" id="view-ordini">
-      <div class="section-head">
-        <h2>Ordini</h2>
-        <button class="btn-primary" id="new-ordine-btn">+ Nuovo ordine</button>
-      </div>
-      <div class="search-bar">
-        <select id="ordine-filter-stato">
-          <option value="">Tutti gli stati</option>
-          <option value="bozza">Bozza</option>
-          <option value="confermato">Confermato</option>
-          <option value="evaso">Evaso</option>
-          <option value="annullato">Annullato</option>
-        </select>
-      </div>
-      <div id="ordini-list"></div>
-    </div>
-
-    <!-- ANALISI -->
-    <div class="view" id="view-analisi">
-      <div class="section-head"><h2>Analisi vendite</h2></div>
-      <div class="stat-grid" id="analisi-stats"></div>
-      <div class="card" style="margin-bottom:14px">
-        <h3 style="margin-top:0">📦 Da riordinare (scorta bassa, storicamente venduti)</h3>
-        <table id="tbl-riordinare"><thead><tr><th>Vino</th><th>Produttore</th><th>Disponibili</th><th>Venduti</th></tr></thead><tbody></tbody></table>
-      </div>
-      <div class="card">
-        <h3 style="margin-top:0">🔁 Da riproporre (venduti bene, fermi da 60+ giorni)</h3>
-        <table id="tbl-riproporre"><thead><tr><th>Vino</th><th>Produttore</th><th>Unità vendute</th><th>Ultima vendita</th></tr></thead><tbody></tbody></table>
-      </div>
-    </div>
-  </main>
-</div>
-
-<div id="modal-root"></div>
-
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 <script>
-/* ================= CONFIG ================= */
-const SUPABASE_URL = "https://xnzqutbfmaofvsurmkxf.supabase.co";
-const SUPABASE_KEY = "sb_publishable_8G0qe9wScbs1JjIhJ9Y3bA_8XN1LZ5o";
-const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-
-let state = { user:null, agente:null, isSignup:false, clienti:[], vini:[], ordini:[], currentOrderLines:[] };
-
-/* ================= UTIL ================= */
-function toast(msg){
-  const t=document.createElement('div'); t.className='toast'; t.textContent=msg;
-  document.body.appendChild(t); setTimeout(()=>t.remove(),2800);
-}
-function fmtMoney(n){ return (n||0).toLocaleString('it-IT',{style:'currency',currency:'EUR'}); }
-function fmtDate(d){ return d ? new Date(d).toLocaleDateString('it-IT') : '—'; }
-function esc(s){ return (s||'').toString().replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
-function openModal(html){
-  document.getElementById('modal-root').innerHTML = `<div class="modal-overlay" id="modal-overlay"><div class="modal">${html}</div></div>`;
-  document.getElementById('modal-overlay').addEventListener('click', e=>{ if(e.target.id==='modal-overlay') closeModal(); });
-}
-function closeModal(){ document.getElementById('modal-root').innerHTML=''; }
-
-// Descrizione automatica del locale a partire dal nome (euristica locale, nessuna chiamata esterna: nessuna chiave API richiesta)
-function descrizioneAuto(nome, tipo, indirizzo){
-  const n = (nome||'').trim();
-  if(!n) return '';
-  const nl = n.toLowerCase();
-  let t = (tipo||'').trim().toLowerCase();
-  if(!t){
-    if(/enotec/.test(nl)) t = 'enoteca';
-    else if(/(hotel|resort)/.test(nl)) t = 'hotel';
-    else if(/(trattoria)/.test(nl)) t = 'trattoria';
-    else if(/(osteria)/.test(nl)) t = 'osteria';
-    else if(/(bar|bistrot|bistro)/.test(nl)) t = 'bar';
-    else t = 'ristorante';
-  }
-  const zona = indirizzo ? indirizzo.split(',').pop().trim() : '';
-  const cueStile = /(gourmet|stella|chef|fine)/.test(nl) ? 'a impostazione gourmet, target carta vini di livello alto'
-    : /(pizz)/.test(nl) ? 'pizzeria/ristorante informale, target vini d\'ingresso e bollicine facili'
-    : /(sushi|giappon|asian|wok|cine)/.test(nl) ? 'cucina orientale, target vini bianchi, bollicine e abbinamenti non convenzionali'
-    : 'target carta vini media, buon potenziale su rossi e bollicine';
-  return `${n} — ${t}${zona ? ' in zona '+zona : ''}, ${cueStile}. Descrizione generata automaticamente dal nome, da verificare e integrare al primo contatto.`;
-}
-
-async function uploadImmagine(file, bucket){
-  if(!file) return null;
-  const ext = file.name.split('.').pop();
-  const path = `${crypto.randomUUID()}.${ext}`;
-  const { error } = await sb.storage.from(bucket).upload(path, file, { upsert: false });
-  if(error){ toast('Errore upload immagine: '+error.message); return null; }
-  const { data } = sb.storage.from(bucket).getPublicUrl(path);
-  return data.publicUrl;
-}
-
-/* ================= AUTH ================= */
-document.getElementById('toggle-signup').addEventListener('click', ()=>{
-  state.isSignup = !state.isSignup;
-  document.getElementById('login-btn').textContent = state.isSignup ? 'Registrati' : 'Accedi';
-  document.getElementById('toggle-signup').textContent = state.isSignup ? 'Hai già un account? Accedi' : 'Non hai un account? Registrati';
-});
-
-document.getElementById('login-form').addEventListener('submit', async (e)=>{
-  e.preventDefault();
-  const email = document.getElementById('login-email').value.trim();
-  const password = document.getElementById('login-password').value;
-  const errEl = document.getElementById('login-err');
-  errEl.classList.add('hidden');
-  const btn = document.getElementById('login-btn');
-  btn.disabled = true;
-  try{
-    let res;
-    if(state.isSignup){
-      res = await sb.auth.signUp({ email, password });
-    } else {
-      res = await sb.auth.signInWithPassword({ email, password });
-    }
-    if(res.error) throw res.error;
-    if(state.isSignup && !res.data.session){
-      toast('Registrazione avviata. Controlla la mail per confermare, poi accedi.');
-      state.isSignup = false;
-      document.getElementById('login-btn').textContent = 'Accedi';
-    }
-  }catch(err){
-    errEl.textContent = err.message || 'Errore di autenticazione';
-    errEl.classList.remove('hidden');
-  }finally{
-    btn.disabled = false;
-  }
-});
-
-document.getElementById('logout-btn').addEventListener('click', async ()=>{
-  await sb.auth.signOut();
-});
-
-document.getElementById('forgot-password').addEventListener('click', async ()=>{
-  const email = document.getElementById('login-email').value.trim();
-  if(!email){ toast('Inserisci prima la tua email nel campo sopra'); return; }
-  const { error } = await sb.auth.resetPasswordForEmail(email, { redirectTo: window.location.href });
-  toast(error ? 'Errore: '+error.message : 'Email di reset inviata, controlla la posta');
-});
-
-sb.auth.onAuthStateChange((event, session)=>{
-  if(session){ boot(session); } else { showLogin(); }
-});
-
-function showLogin(){
-  document.getElementById('login-view').style.display='flex';
-  document.getElementById('app-view').style.display='none';
-}
-
-async function boot(session){
-  state.user = session.user;
-  document.getElementById('login-view').style.display='none';
-  document.getElementById('app-view').style.display='block';
-
-  let { data: agente } = await sb.from('agenti').select('*').eq('id', state.user.id).maybeSingle();
-  if(!agente){
-    // fallback nel caso il trigger non sia ancora passato
-    const { data } = await sb.from('agenti').insert({ id: state.user.id, nome: state.user.email.split('@')[0], email: state.user.email }).select().single();
-    agente = data;
-  }
-  state.agente = agente;
-  state.isAdmin = agente?.ruolo === 'admin';
-  document.getElementById('agente-nome').textContent = agente?.nome || state.user.email;
-  document.getElementById('new-vino-btn').classList.toggle('hidden', !state.isAdmin);
-
-  await Promise.all([loadClienti(), loadVini(), loadOrdini()]);
-  renderClienti(); renderVini(); renderOrdini(); renderAnalisi();
-}
-
-/* ================= TABS ================= */
-document.querySelectorAll('nav.tabs button').forEach(btn=>{
-  btn.addEventListener('click', ()=>{
-    document.querySelectorAll('nav.tabs button').forEach(b=>b.classList.remove('active'));
-    btn.classList.add('active');
-    document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
-    document.getElementById('view-'+btn.dataset.view).classList.add('active');
-    if(btn.dataset.view==='analisi') renderAnalisi();
-  });
-});
-
-/* ================= CLIENTI ================= */
-async function loadClienti(){
-  const { data, error } = await sb.from('clienti').select('*, agenti(nome)').order('nome_locale');
-  if(error){ toast('Errore caricamento clienti'); return; }
-  state.clienti = data || [];
-}
-
-function renderClienti(){
-  const q = (document.getElementById('cliente-search').value||'').toLowerCase();
-  const statoF = document.getElementById('cliente-filter-stato').value;
-  const list = state.clienti.filter(c=>{
-    const matchQ = !q || (c.nome_locale||'').toLowerCase().includes(q) || (c.indirizzo||'').toLowerCase().includes(q) || (c.agenti?.nome||'').toLowerCase().includes(q);
-    const matchS = !statoF || c.stato===statoF;
-    return matchQ && matchS;
-  });
-  const el = document.getElementById('clienti-list');
-  if(!list.length){ el.innerHTML = `<div class="empty-state">Nessun cliente trovato.</div>`; return; }
-  el.innerHTML = list.map(c=>`
-    <div class="list-item" onclick="openClienteDetail('${c.id}')">
-      <div style="display:flex;justify-content:space-between;align-items:start">
-        <h3>${esc(c.nome_locale)}</h3>
-        <span class="badge ${c.stato}">${c.stato}</span>
-      </div>
-      <div class="meta">${esc(c.tipo_locale||'—')} · ${esc(c.indirizzo||'indirizzo non impostato')}</div>
-      <div class="meta">Agente: ${esc(c.agenti?.nome || '—')}</div>
-    </div>
-  `).join('');
-}
-document.getElementById('cliente-search').addEventListener('input', renderClienti);
-document.getElementById('cliente-filter-stato').addEventListener('change', renderClienti);
-
-document.getElementById('new-cliente-btn').addEventListener('click', ()=>openClienteForm());
-
-function openClienteForm(cliente){
-  const c = cliente || {};
-  openModal(`
-    <h2>${cliente ? 'Modifica cliente' : 'Nuovo cliente'}</h2>
-    <form id="cliente-form">
-      <div class="form-row full"><div><label>Nome locale *</label><input required id="f-nome" value="${esc(c.nome_locale)}"></div></div>
-      <div class="form-row full"><div><label>Foto locale</label><input type="file" accept="image/*" id="f-immagine">
-        ${c.immagine_url ? `<img src="${esc(c.immagine_url)}" style="max-width:100%;border-radius:10px;margin-top:8px">` : ''}
-      </div></div>
-      <div class="form-row">
-        <div><label>Tipo locale</label><input id="f-tipo" placeholder="ristorante, enoteca, hotel..." value="${esc(c.tipo_locale)}"></div>
-        <div><label>Stato</label>
-          <select id="f-stato">
-            <option value="prospect" ${c.stato==='prospect'?'selected':''}>Prospect</option>
-            <option value="attivo" ${c.stato==='attivo'||!c.stato?'selected':''}>Attivo</option>
-            <option value="inattivo" ${c.stato==='inattivo'?'selected':''}>Inattivo</option>
-          </select>
-        </div>
-      </div>
-      <div class="form-row full"><div><label>Indirizzo</label><input id="f-indirizzo" placeholder="Via, città" value="${esc(c.indirizzo)}"></div></div>
-      <div class="form-row">
-        <div><label>Telefono</label><input id="f-telefono" value="${esc(c.telefono)}"></div>
-        <div><label>Email</label><input id="f-email" value="${esc(c.email)}"></div>
-      </div>
-      <div class="tag-title">Sommelier</div>
-      <div class="form-row">
-        <div><label>Nome</label><input id="f-somm-nome" value="${esc(c.sommelier_nome)}"></div>
-        <div><label>Contatto</label><input id="f-somm-contatto" value="${esc(c.sommelier_contatto)}"></div>
-      </div>
-      <div class="tag-title">Buyer</div>
-      <div class="form-row">
-        <div><label>Nome</label><input id="f-buyer-nome" value="${esc(c.buyer_nome)}"></div>
-        <div><label>Contatto</label><input id="f-buyer-contatto" value="${esc(c.buyer_contatto)}"></div>
-      </div>
-      <div class="form-row full"><div><label>Note</label><textarea id="f-note" rows="2">${esc(c.note)}</textarea></div></div>
-      <div class="modal-actions">
-        ${cliente ? '<button type="button" class="btn-danger" id="c-delete">Elimina</button>' : ''}
-        <button type="button" class="btn-secondary" onclick="closeModal()">Annulla</button>
-        <button type="submit" class="btn-primary">Salva</button>
-      </div>
-    </form>
-  `);
-  if(cliente){
-    document.getElementById('c-delete').addEventListener('click', async ()=>{
-      if(!confirm(`Eliminare definitivamente ${cliente.nome_locale}? L'operazione non è reversibile.`)) return;
-      const { error } = await sb.from('clienti').delete().eq('id', cliente.id);
-      if(error){
-        if(error.code === '23503' || /foreign key/i.test(error.message)){
-          toast('Il cliente ha ordini collegati: non può essere eliminato. Impostalo su "inattivo" invece.');
-        } else {
-          toast('Errore: '+error.message);
-        }
-        return;
-      }
-      closeModal(); toast('Cliente eliminato'); await loadClienti(); renderClienti();
-    });
-  }
-  document.getElementById('cliente-form').addEventListener('submit', async (e)=>{
-    e.preventDefault();
-    const nome = document.getElementById('f-nome').value.trim();
-    const tipo = document.getElementById('f-tipo').value.trim();
-    const indirizzo = document.getElementById('f-indirizzo').value.trim();
-    const payload = {
-      nome_locale: nome,
-      tipo_locale: tipo,
-      stato: document.getElementById('f-stato').value,
-      indirizzo,
-      telefono: document.getElementById('f-telefono').value.trim(),
-      email: document.getElementById('f-email').value.trim(),
-      sommelier_nome: document.getElementById('f-somm-nome').value.trim(),
-      sommelier_contatto: document.getElementById('f-somm-contatto').value.trim(),
-      buyer_nome: document.getElementById('f-buyer-nome').value.trim(),
-      buyer_contatto: document.getElementById('f-buyer-contatto').value.trim(),
-      note: document.getElementById('f-note').value.trim(),
-      descrizione_auto: descrizioneAuto(nome, tipo, indirizzo),
-    };
-    if(indirizzo){
-      try{
-        const geo = await geocodeAddress(indirizzo);
-        if(geo){ payload.lat = geo.lat; payload.lng = geo.lng; }
-      }catch(_){}
-    }
-    const fileInput = document.getElementById('f-immagine');
-    if(fileInput.files[0]){
-      const url = await uploadImmagine(fileInput.files[0], 'locali-immagini');
-      if(url) payload.immagine_url = url;
-    }
-    let error;
-    if(cliente?.id){
-      ({ error } = await sb.from('clienti').update(payload).eq('id', cliente.id));
-    } else {
-      payload.agente_id = state.user.id;
-      ({ error } = await sb.from('clienti').insert(payload));
-    }
-    if(error){ toast('Errore salvataggio: '+error.message); return; }
-    closeModal(); toast('Cliente salvato'); await loadClienti(); renderClienti();
-  });
-}
-
-async function geocodeAddress(address){
-  const url = `https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${encodeURIComponent(address)}`;
-  const res = await fetch(url, { headers: { 'Accept-Language':'it' } });
-  const data = await res.json();
-  if(data && data[0]) return { lat: parseFloat(data[0].lat), lng: parseFloat(data[0].lon) };
-  return null;
-}
-
-window.openClienteDetail = function(id){
-  const c = state.clienti.find(x=>x.id===id);
-  if(!c) return;
-  const ordiniCliente = state.ordini.filter(o=>o.cliente_id===id);
-  openModal(`
-    <h2>${esc(c.nome_locale)} <span class="badge ${c.stato}">${c.stato}</span></h2>
-    ${c.immagine_url ? `<img src="${esc(c.immagine_url)}" style="width:100%;max-height:180px;object-fit:cover;border-radius:10px;margin-bottom:10px">` : ''}
-    <p class="meta">${esc(c.descrizione_auto || '')}</p>
-    <div class="tag-title">Contatti</div>
-    <div>${esc(c.indirizzo||'—')}<br>${esc(c.telefono||'')} ${c.email?('· '+esc(c.email)):''}</div>
-    <div class="tag-title">Sommelier</div>
-    <div>${esc(c.sommelier_nome||'—')} ${c.sommelier_contatto?('· '+esc(c.sommelier_contatto)):''}</div>
-    <div class="tag-title">Buyer</div>
-    <div>${esc(c.buyer_nome||'—')} ${c.buyer_contatto?('· '+esc(c.buyer_contatto)):''}</div>
-    ${c.lat && c.lng ? '<div id="map"></div>' : ''}
-    <div class="tag-title">Storico ordini (${ordiniCliente.length})</div>
-    ${ordiniCliente.length ? ordiniCliente.map(o=>`<div class="order-line"><span>${fmtDate(o.data_ordine)} · ${o.stato}</span><span>${fmtMoney(o.totale)}</span></div>`).join('') : '<p class="meta">Nessun ordine ancora.</p>'}
-    <div class="modal-actions">
-      <button class="btn-secondary" onclick="closeModal()">Chiudi</button>
-      <button class="btn-primary" onclick="closeModal();openClienteForm(${JSON.stringify(c).replace(/"/g,'&quot;')})">Modifica</button>
-    </div>
-  `);
-  if(c.lat && c.lng){
-    setTimeout(()=>{
-      const map = L.map('map', {zoomControl:false, dragging:false, scrollWheelZoom:false}).setView([c.lat, c.lng], 15);
-      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'&copy; OpenStreetMap'}).addTo(map);
-      L.marker([c.lat, c.lng]).addTo(map);
-    }, 50);
-  }
+window.WA_CONFIG = {
+  demo: false,           // true = backend finto in locale, nessun Supabase necessario
+  supabaseUrl: "https://xnzqutbfmaofvsurmkxf.supabase.co",
+  supabaseKey: "sb_publishable_8G0qe9wScbs1JjIhJ9Y3bA_8XN1LZ5o",
+  schema: "crm",
+  nome: "Wine Alchemist",
+  zona: "Milano",
+  mappaCentro: [45.4642, 9.19],
+  cartone: 6            // passo dello stepper quantità
 };
-
-/* ================= CATALOGO VINI ================= */
-async function loadVini(){
-  const { data, error } = await sb.from('vini').select('*').eq('attivo', true).order('nome');
-  if(error){ toast('Errore caricamento catalogo'); return; }
-  state.vini = data || [];
-}
-
-function renderVini(){
-  const q = (document.getElementById('vino-search').value||'').toLowerCase();
-  const list = state.vini.filter(v=>!q || (v.nome||'').toLowerCase().includes(q) || (v.produttore||'').toLowerCase().includes(q) || (v.tipologia||'').toLowerCase().includes(q));
-  const el = document.getElementById('vini-list');
-  if(!list.length){ el.innerHTML = `<div class="empty-state">Nessuna referenza trovata.</div>`; return; }
-  el.innerHTML = list.map(v=>`
-    <div class="list-item" ${state.isAdmin ? `onclick="openVinoForm(${JSON.stringify(v).replace(/"/g,'&quot;')})"` : 'style="cursor:default"'}>
-      ${v.immagine_url ? `<img src="${esc(v.immagine_url)}" style="width:100%;height:100px;object-fit:cover;border-radius:8px;margin-bottom:8px">` : ''}
-      <h3>${esc(v.nome)} ${v.annata?('· '+v.annata):''}</h3>
-      <div class="meta">${esc(v.produttore||'—')} · ${esc(v.tipologia||'—')}</div>
-      <div class="meta">${fmtMoney(v.prezzo_listino)} · disponibili: ${v.quantita_disponibile}</div>
-    </div>
-  `).join('');
-}
-document.getElementById('vino-search').addEventListener('input', renderVini);
-document.getElementById('new-vino-btn').addEventListener('click', ()=>openVinoForm());
-
-window.openVinoForm = function(vino){
-  const v = vino || {};
-  openModal(`
-    <h2>${vino ? 'Modifica referenza' : 'Nuova referenza'}</h2>
-    <form id="vino-form">
-      <div class="form-row"><div><label>Nome *</label><input required id="v-nome" value="${esc(v.nome)}"></div><div><label>Annata</label><input type="number" id="v-annata" value="${v.annata||''}"></div></div>
-      <div class="form-row full"><div><label>Foto etichetta</label><input type="file" accept="image/*" id="v-immagine">
-        ${v.immagine_url ? `<img src="${esc(v.immagine_url)}" style="max-height:120px;border-radius:10px;margin-top:8px">` : ''}
-      </div></div>
-      <div class="form-row"><div><label>Produttore</label><input id="v-produttore" value="${esc(v.produttore)}"></div><div><label>Zona</label><input id="v-zona" value="${esc(v.zona)}"></div></div>
-      <div class="form-row"><div><label>Tipologia</label><input id="v-tipologia" placeholder="rosso, bianco, bolle..." value="${esc(v.tipologia)}"></div><div><label>Codice referenza</label><input id="v-codice" value="${esc(v.referenza_codice)}"></div></div>
-      <div class="form-row"><div><label>Prezzo listino (€)</label><input type="number" step="0.01" id="v-prezzo" value="${v.prezzo_listino||''}"></div><div><label>Quantità disponibile</label><input type="number" id="v-qta" value="${v.quantita_disponibile??0}"></div></div>
-      <div class="form-row full"><div><label>Descrizione</label><textarea id="v-desc" rows="2">${esc(v.descrizione)}</textarea></div></div>
-      <div class="modal-actions">
-        ${vino ? '<button type="button" class="btn-danger" id="v-delete">Elimina</button>' : ''}
-        <button type="button" class="btn-secondary" onclick="closeModal()">Annulla</button>
-        <button type="submit" class="btn-primary">Salva</button>
-      </div>
-    </form>
-  `);
-  if(vino){
-    document.getElementById('v-delete').addEventListener('click', async ()=>{
-      if(!confirm('Eliminare questa referenza?')) return;
-      const { error } = await sb.from('vini').update({attivo:false}).eq('id', vino.id);
-      if(error){ toast('Errore: '+error.message); return; }
-      closeModal(); toast('Referenza rimossa'); await loadVini(); renderVini();
-    });
-  }
-  document.getElementById('vino-form').addEventListener('submit', async (e)=>{
-    e.preventDefault();
-    const payload = {
-      nome: document.getElementById('v-nome').value.trim(),
-      annata: document.getElementById('v-annata').value ? parseInt(document.getElementById('v-annata').value) : null,
-      produttore: document.getElementById('v-produttore').value.trim(),
-      zona: document.getElementById('v-zona').value.trim(),
-      tipologia: document.getElementById('v-tipologia').value.trim(),
-      referenza_codice: document.getElementById('v-codice').value.trim() || null,
-      prezzo_listino: parseFloat(document.getElementById('v-prezzo').value) || 0,
-      quantita_disponibile: parseInt(document.getElementById('v-qta').value) || 0,
-      descrizione: document.getElementById('v-desc').value.trim(),
-    };
-    const vFileInput = document.getElementById('v-immagine');
-    if(vFileInput.files[0]){
-      const url = await uploadImmagine(vFileInput.files[0], 'vini-immagini');
-      if(url) payload.immagine_url = url;
-    }
-    let error;
-    if(vino?.id){ ({ error } = await sb.from('vini').update(payload).eq('id', vino.id)); }
-    else { ({ error } = await sb.from('vini').insert(payload)); }
-    if(error){ toast('Errore salvataggio: '+error.message); return; }
-    closeModal(); toast('Referenza salvata'); await loadVini(); renderVini();
-  });
-};
-
-/* ================= ORDINI ================= */
-async function loadOrdini(){
-  const { data, error } = await sb.from('ordini').select('*, clienti(nome_locale), agenti(nome), ordini_righe(*, vini(nome))').order('data_ordine', {ascending:false});
-  if(error){ toast('Errore caricamento ordini'); return; }
-  state.ordini = data || [];
-}
-
-function renderOrdini(){
-  const statoF = document.getElementById('ordine-filter-stato').value;
-  const list = state.ordini.filter(o=>!statoF || o.stato===statoF);
-  const el = document.getElementById('ordini-list');
-  if(!list.length){ el.innerHTML = `<div class="empty-state">Nessun ordine trovato.</div>`; return; }
-  el.innerHTML = `<div class="card"><table><thead><tr><th>Data</th><th>Cliente</th><th>Agente</th><th>Stato</th><th>Totale</th></tr></thead><tbody>
-    ${list.map(o=>`<tr style="cursor:pointer" onclick="openOrdineDetail('${o.id}')">
-      <td>${fmtDate(o.data_ordine)}</td><td>${esc(o.clienti?.nome_locale||'—')}</td><td>${esc(o.agenti?.nome||'—')}</td>
-      <td><span class="badge ${o.stato==='annullato'?'inattivo':(o.stato==='evaso'?'attivo':'prospect')}">${o.stato}</span></td>
-      <td>${fmtMoney(o.totale)}</td>
-    </tr>`).join('')}
-  </tbody></table></div>`;
-}
-document.getElementById('ordine-filter-stato').addEventListener('change', renderOrdini);
-
-window.openOrdineDetail = function(id){
-  const o = state.ordini.find(x=>x.id===id);
-  if(!o) return;
-  openModal(`
-    <h2>Ordine · ${esc(o.clienti?.nome_locale||'—')}</h2>
-    <p class="meta">${fmtDate(o.data_ordine)} · agente ${esc(o.agenti?.nome||'—')}</p>
-    <label>Stato</label>
-    <select id="o-stato">
-      ${['bozza','confermato','evaso','annullato'].map(s=>`<option value="${s}" ${o.stato===s?'selected':''}>${s}</option>`).join('')}
-    </select>
-    <div class="tag-title">Righe</div>
-    ${(o.ordini_righe||[]).map(r=>`<div class="order-line"><span>${esc(r.vini?.nome||'—')} × ${r.quantita}</span><span>${fmtMoney(r.quantita*r.prezzo_unitario)}</span></div>`).join('')}
-    <div class="total-row"><span>Totale</span><span>${fmtMoney(o.totale)}</span></div>
-    <div class="modal-actions">
-      <button class="btn-secondary" onclick="closeModal()">Chiudi</button>
-      <button class="btn-primary" id="o-save">Aggiorna stato</button>
-    </div>
-  `);
-  document.getElementById('o-save').addEventListener('click', async ()=>{
-    const nuovoStato = document.getElementById('o-stato').value;
-    const { error } = await sb.from('ordini').update({stato:nuovoStato}).eq('id', o.id);
-    if(error){ toast('Errore: '+error.message); return; }
-    closeModal(); toast('Ordine aggiornato'); await loadOrdini(); renderOrdini();
-  });
-};
-
-document.getElementById('new-ordine-btn').addEventListener('click', ()=>{
-  if(!state.clienti.length){ toast('Aggiungi prima un cliente'); return; }
-  if(!state.vini.length){ toast('Aggiungi prima delle referenze al catalogo'); return; }
-  state.currentOrderLines = {};
-  openModal(`
-    <h2>Nuovo ordine</h2>
-    <label>Cliente</label>
-    <select id="no-cliente">${state.clienti.map(c=>`<option value="${c.id}">${esc(c.nome_locale)}</option>`).join('')}</select>
-    <div class="tag-title">Seleziona referenze</div>
-    <div id="no-vini-list">${state.vini.map(v=>`
-      <div class="wine-pick">
-        <div>${esc(v.nome)} <span class="meta">${fmtMoney(v.prezzo_listino)}</span></div>
-        <input type="number" min="0" value="0" class="qty" data-vino="${v.id}" data-prezzo="${v.prezzo_listino}">
-      </div>`).join('')}</div>
-    <div class="total-row"><span>Totale</span><span id="no-totale">${fmtMoney(0)}</span></div>
-    <div class="modal-actions">
-      <button type="button" class="btn-secondary" onclick="closeModal()">Annulla</button>
-      <button type="button" class="btn-primary" id="no-save">Crea ordine</button>
-    </div>
-  `);
-  const recalc = ()=>{
-    let tot=0;
-    document.querySelectorAll('#no-vini-list .qty').forEach(inp=>{ tot += (parseInt(inp.value)||0) * parseFloat(inp.dataset.prezzo); });
-    document.getElementById('no-totale').textContent = fmtMoney(tot);
-  };
-  document.querySelectorAll('#no-vini-list .qty').forEach(inp=>inp.addEventListener('input', recalc));
-  document.getElementById('no-save').addEventListener('click', async ()=>{
-    const clienteId = document.getElementById('no-cliente').value;
-    const righe = [];
-    document.querySelectorAll('#no-vini-list .qty').forEach(inp=>{
-      const qta = parseInt(inp.value)||0;
-      if(qta>0) righe.push({ vino_id: inp.dataset.vino, quantita: qta, prezzo_unitario: parseFloat(inp.dataset.prezzo) });
-    });
-    if(!righe.length){ toast('Seleziona almeno una referenza'); return; }
-    const { data: ordine, error } = await sb.from('ordini').insert({ cliente_id: clienteId, agente_id: state.user.id, stato:'confermato' }).select().single();
-    if(error){ toast('Errore: '+error.message); return; }
-    const { error: err2 } = await sb.from('ordini_righe').insert(righe.map(r=>({...r, ordine_id: ordine.id})));
-    if(err2){ toast('Errore righe: '+err2.message); return; }
-    closeModal(); toast('Ordine creato'); await Promise.all([loadOrdini(), loadVini()]); renderOrdini(); renderVini();
-  });
-});
-
-/* ================= ANALISI ================= */
-async function renderAnalisi(){
-  const [riordinare, riproporre] = await Promise.all([
-    sb.from('v_da_riordinare').select('*').limit(15),
-    sb.from('v_da_riproporre').select('*').limit(15),
-  ]);
-  const totOrdini = state.ordini.filter(o=>o.stato!=='annullato').length;
-  const totFatturato = state.ordini.filter(o=>o.stato!=='annullato').reduce((s,o)=>s+parseFloat(o.totale||0),0);
-  const clientiAttivi = state.clienti.filter(c=>c.stato==='attivo').length;
-  document.getElementById('analisi-stats').innerHTML = `
-    <div class="stat-card"><div class="num">${totOrdini}</div><div class="lbl">Ordini totali</div></div>
-    <div class="stat-card"><div class="num">${fmtMoney(totFatturato)}</div><div class="lbl">Fatturato totale</div></div>
-    <div class="stat-card"><div class="num">${clientiAttivi}</div><div class="lbl">Clienti attivi</div></div>
-    <div class="stat-card"><div class="num">${state.vini.length}</div><div class="lbl">Referenze in catalogo</div></div>
-  `;
-  const tb1 = document.querySelector('#tbl-riordinare tbody');
-  tb1.innerHTML = (riordinare.data||[]).map(r=>`<tr><td>${esc(r.nome)}</td><td>${esc(r.produttore||'—')}</td><td>${r.quantita_disponibile}</td><td>${r.unita_vendute}</td></tr>`).join('') || '<tr><td colspan="4" class="meta">Nessun dato.</td></tr>';
-  const tb2 = document.querySelector('#tbl-riproporre tbody');
-  tb2.innerHTML = (riproporre.data||[]).map(r=>`<tr><td>${esc(r.nome)}</td><td>${esc(r.produttore||'—')}</td><td>${r.unita_vendute}</td><td>${fmtDate(r.ultima_vendita)}</td></tr>`).join('') || '<tr><td colspan="4" class="meta">Nessun dato.</td></tr>';
-}
 </script>
+<script>
+  // In demo carica solo il backend locale; altrimenti il client Supabase.
+  document.write(window.WA_CONFIG.demo
+    ? '<scr'+'ipt src="crm_demo.js"></scr'+'ipt>'
+    : '<scr'+'ipt src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></scr'+'ipt>');
+</script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script src="crm_map.js"></script>
+<script src="crm_insights.js"></script>
+<script src="crm_client_form.js"></script>
+<script src="crm.js"></script>
 </body>
 </html>
