@@ -911,6 +911,8 @@ addRoute('ordine', async (id, extra) => {
     paint(`<div class="ord-layout">
       <div class="ord-header">
         <div class="bar"><a href="#/ordini" class="btn line sm">Ordini</a><span style="flex:1"></span>
+          <button class="btn line sm" id="dup">Duplica</button>
+          ${o.stato === 'bozza' && (isAdmin() || o.agent_id === S.me.id) ? '<button class="btn line sm" id="delOrd" style="color:var(--red)">Elimina</button>' : ''}
           <button class="btn line sm" id="share">Condividi</button>${pill(o.stato)}</div>
         <h1 class="mono" style="font-size:22px">${esc(o.numero)}</h1>
         <div class="inset" style="margin-top:12px">
@@ -990,6 +992,28 @@ addRoute('ordine', async (id, extra) => {
       go(() => setQty(w, cur + (inc ? passo(w) : -passo(w))));
     };
     $('#share').addEventListener('click', () => condividi(o, [...items.values()], cli));
+    $('#dup').addEventListener('click', () => go(async () => {
+      const ins = await sb.from('orders')
+        .insert({ client_id: o.client_id, agent_id: S.me.id, pagamento: o.pagamento }).select().single();
+      if (ins.error) throw ins.error;
+      const righe = [...items.values()];
+      if (righe.length) {
+        const r = await sb.from('order_items').insert(righe.map(i => ({
+          order_id: ins.data.id, wine_id: i.wine_id, qty: i.qty, sconto_pct: i.sconto_pct
+        })));
+        if (r.error) throw r.error;
+      }
+      toast('Ordine duplicato in bozza');
+      location.hash = '#/ordine/' + ins.data.id;
+    }));
+    const delB = $('#delOrd');
+    if (delB) delB.addEventListener('click', () => go(async () => {
+      if (!confirm(`Eliminare definitivamente la bozza ${o.numero}?`)) return;
+      const r = await sb.from('orders').delete().eq('id', o.id);
+      if (r.error) throw r.error;
+      toast('Bozza eliminata');
+      location.hash = '#/ordini';
+    }));
     document.querySelectorAll('[data-go]').forEach(b => b.addEventListener('click', () => go(async () => {
       b.disabled = true;
       try {
