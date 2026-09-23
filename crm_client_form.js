@@ -51,19 +51,6 @@ const CrmClientForm = (() => {
       { k: 'coperti', l: 'Coperti', t: 'number' },
       { k: 'scontrino_medio', l: 'Scontrino medio', t: 'money' }
     ]},
-    { id: 'carta', title: 'Carta dei vini', fields: [
-      { k: 'n_referenze_carta', l: 'Referenze in carta', t: 'number' },
-      { k: 'prezzo_medio_carta', l: 'Prezzo medio bottiglia in carta', t: 'money' },
-      { k: 'ricarico_medio', l: 'Ricarico medio (×)', t: 'number', step: '0.1', placeholder: 'es. 2.8' },
-      { k: 'vino_calice', l: 'Vino al calice', t: 'bool' },
-      { k: 'n_etichette_calice', l: 'Etichette al calice', t: 'number', showIf: v => v.vino_calice },
-      { k: 'sistema_mescita', l: 'Sistema di mescita', t: 'text', placeholder: 'es. Coravin, Enomatic', showIf: v => v.vino_calice },
-      { k: 'cantina_capacita', l: 'Capienza cantina (bt)', t: 'number' },
-      { k: 'cantina_climatizzata', l: 'Cantina climatizzata', t: 'bool' },
-      { k: 'tipologie_pref', l: 'Tipologie richieste', t: 'chips', o: OPT.tipologie },
-      { k: 'stili_pref', l: 'Stili / filosofia', t: 'chips', o: OPT.stili },
-      { k: 'regioni_pref', l: 'Territori in carta', t: 'chips', o: OPT.regioni }
-    ]},
     { id: 'operativita', title: 'Visite e consegne', fields: [
       { k: 'giorni_chiusura', l: 'Giorni di chiusura', t: 'chips', o: OPT.giorni },
       { k: 'chiusura_stagionale', l: 'Chiusura stagionale', t: 'text', placeholder: 'es. 2ª e 3ª settimana di agosto' },
@@ -94,7 +81,9 @@ const CrmClientForm = (() => {
     { k: 'reperibilita', l: 'Reperibilità', t: 'text', placeholder: 'es. dopo le 15' },
     { k: 'decisore', l: 'Decide gli acquisti', t: 'bool' },
     { k: 'principale', l: 'Contatto principale', t: 'bool' },
-    { k: 'note', l: 'Note', t: 'textarea', placeholder: 'Gusti, formazione (AIS, WSET…), preferenze' }
+    { k: 'note', l: 'Note', t: 'textarea', placeholder: 'Gusti, formazione (AIS, WSET…), preferenze' },
+    { k: 'data_inizio', l: 'Qui da', t: 'date' },
+    { k: 'data_fine', l: 'Andato via il (vuoto se ancora qui)', t: 'date' }
   ];
 
   const esc = s => String(s ?? '').replace(/[&<>"']/g, c =>
@@ -122,7 +111,7 @@ const CrmClientForm = (() => {
         input = `<input name="${name}" list="dl-${name}" value="${esc(val)}"${dis}>
           <datalist id="dl-${name}">${f.o.map(o => `<option value="${esc(o)}">`).join('')}</datalist>`; break;
       default: {
-        const type = { money: 'number', number: 'number', tel: 'tel', email: 'email', url: 'url' }[f.t] ?? 'text';
+        const type = { money: 'number', number: 'number', tel: 'tel', email: 'email', url: 'url', date: 'date' }[f.t] ?? 'text';
         const step = f.t === 'money' ? '0.01' : (f.step ?? '1');
         input = `<input type="${type}" name="${name}" value="${esc(val)}"${type === 'number' ? ` step="${step}" min="0"` : ''}
           ${f.inputmode ? `inputmode="${f.inputmode}"` : ''} ${f.max ? `maxlength="${f.max}"` : ''}
