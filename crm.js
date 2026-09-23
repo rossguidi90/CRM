@@ -237,7 +237,7 @@ addRoute('home', async () => {
   const [trend6, recall, ordini, { data: prom }] = await Promise.all([
     CrmInsights.trend(sb, da6, oggi, { grain: 'month' }).catch(() => []),
     CrmInsights.toRecall(sb),
-    sb.from('orders').select('id, numero, stato, totale, created_at, client_id').order('created_at', { ascending: false }).limit(6),
+    sb.from('orders').select('id, numero, stato, totale, created_at, client_id, agent_id').order('created_at', { ascending: false }).limit(6),
     (() => { let q = sb.from('reminders').select('*').eq('fatto', false)
       .lte('due_at', new Date(Date.now() + 7 * 864e5).toISOString()).order('due_at').limit(20);
       return isAdmin() || isViewer() ? q : q.eq('agent_id', S.me.id); })()
@@ -274,7 +274,7 @@ addRoute('home', async () => {
     </div></div>
     <div class="group"><h3>Ultimi ordini</h3><div class="inset">
       ${(ordini.data || []).map(o => rowLink(`#/ordine/${o.id}`, o.numero,
-        `${nome(o.client_id)} · ${dmy(o.created_at)}`, `<span class="mono">${eur(o.totale)}</span>${pill(o.stato)}`, false)).join('')
+        `${nome(o.client_id)} · ${dmy(o.created_at)}${S.agents[o.agent_id] && innerWidth < 720 ? ' · ' + S.agents[o.agent_id].nome : ''}`, `${S.agents[o.agent_id] ? `<span class="pill hide-m"><i class="dot-ag" style="--ac:${S.agents[o.agent_id].colore}"></i>${esc(S.agents[o.agent_id].nome)}</span>` : ''}<span class="mono">${eur(o.totale)}</span>${pill(o.stato)}`, false)).join('')
         || '<div class="empty">Nessun ordine.</div>'}
     </div></div>`);
   bindProm($('#promList'));
@@ -1079,7 +1079,7 @@ addRoute('ordini', async () => {
       (!f.q || (o.numero + ' ' + nomeCli(o.client_id)).toLowerCase().includes(f.q.toLowerCase())));
     $('#lista').innerHTML = list.map(o => `<a href="#/ordine/${o.id}"><div class="row">
       <span style="flex:1;min-width:0"><span class="ttl mono">${esc(o.numero)}</span><br>
-        <span class="sub">${esc(nomeCli(o.client_id))} · ${dmy(o.inviato_at || o.created_at)}
+        <span class="sub">${esc(nomeCli(o.client_id))} · ${dmy(o.inviato_at || o.created_at)}${S.agents[o.agent_id] ? ' · ' + esc(S.agents[o.agent_id].nome) : ''}
         ${o.scade_at ? ' · scade ' + dmy(o.scade_at) : ''}</span></span>
       <span class="mono">${eur(o.totale)}</span>${pill(o.stato)}${svg('chev', 14, 'chev')}</div></a>`).join('')
       || '<div class="empty">Nessun ordine.</div>';
