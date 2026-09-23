@@ -51,6 +51,19 @@ const CrmClientForm = (() => {
       { k: 'coperti', l: 'Coperti', t: 'number' },
       { k: 'scontrino_medio', l: 'Scontrino medio', t: 'money' }
     ]},
+    { id: 'carta', title: 'Carta dei vini', fields: [
+      { k: 'n_referenze_carta', l: 'Referenze in carta', t: 'number' },
+      { k: 'prezzo_medio_carta', l: 'Prezzo medio bottiglia in carta', t: 'money' },
+      { k: 'ricarico_medio', l: 'Ricarico medio (×)', t: 'number', step: '0.1', placeholder: 'es. 2.8' },
+      { k: 'vino_calice', l: 'Vino al calice', t: 'bool' },
+      { k: 'n_etichette_calice', l: 'Etichette al calice', t: 'number', showIf: v => v.vino_calice },
+      { k: 'sistema_mescita', l: 'Sistema di mescita', t: 'text', placeholder: 'es. Coravin, Enomatic', showIf: v => v.vino_calice },
+      { k: 'cantina_capacita', l: 'Capienza cantina (bt)', t: 'number' },
+      { k: 'cantina_climatizzata', l: 'Cantina climatizzata', t: 'bool' },
+      { k: 'tipologie_pref', l: 'Tipologie richieste', t: 'chips', o: OPT.tipologie },
+      { k: 'stili_pref', l: 'Stili / filosofia', t: 'chips', o: OPT.stili },
+      { k: 'regioni_pref', l: 'Territori in carta', t: 'chips', o: OPT.regioni }
+    ]},
     { id: 'operativita', title: 'Visite e consegne', fields: [
       { k: 'giorni_chiusura', l: 'Giorni di chiusura', t: 'chips', o: OPT.giorni },
       { k: 'chiusura_stagionale', l: 'Chiusura stagionale', t: 'text', placeholder: 'es. 2ª e 3ª settimana di agosto' },

@@ -23,7 +23,7 @@ const loadScript = src => new Promise((ok, ko) => {
 const timeout = (p, ms, msg) => Promise.race([p,
   new Promise((_, ko) => setTimeout(() => ko(new Error(msg)), ms))]);
 
-const S = { me: null, agents: {}, clients: [], view: null, busy: false, filtro: { q: '', set: 'tutti' } };
+const S = { me: null, agents: {}, clients: [], view: null, busy: false, filtro: { q: '', set: 'tutti', agente: '', stato: '', sort: 'nome' }, anim: false };
 
 /* ---------- utilità ---------- */
 const $ = (s, r = document) => r.querySelector(s);
@@ -55,7 +55,8 @@ const ICON = {
   cerca: 'M11 4a7 7 0 1 0 0 14 7 7 0 0 0 0-14M21 21l-5-5',
   chev: 'M9 6l6 6-6 6', piu: 'M12 5v14M5 12h14',
   tel: 'M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2',
-  chat: 'M4 5h16v11H9l-5 4z', mail: 'M3 6h18v12H3zM3 7l9 6 9-6',
+  chat: 'M4 5h16v11H9l-5 4z', cal: 'M4 6h16v14H4zM4 10h16M8 3v5M16 3v5', doc: 'M7 3h8l4 4v14H7zM15 3v4h4M10 13h6M10 17h4',
+  rifai: 'M4 12a8 8 0 0 1 14-5.3L20 9M20 4v5h-5M20 12a8 8 0 0 1-14 5.3L4 15M4 20v-5h5', mail: 'M3 6h18v12H3zM3 7l9 6 9-6',
   pin: 'M12 21s-7-6.5-7-12a7 7 0 0 1 14 0c0 5.5-7 12-7 12zM12 11.5a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5',
   star: 'M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8z'
 };
@@ -169,11 +170,15 @@ const isAdmin = () => S.me?.ruolo === 'admin';
 const isViewer = () => S.me?.ruolo === 'viewer';
 const mine = c => c.agent_id === S.me.id;
 const canEdit = c => isAdmin() || mine(c);
+const canOrder = c => isAdmin() || isViewer() || mine(c);
 
 function setNav(k) {
   document.querySelectorAll('[data-nav]').forEach(a => a.classList.toggle('on', a.dataset.nav === k));
 }
-const paint = html => { $('#main').innerHTML = html; window.scrollTo(0, 0); };
+const paint = html => {
+  const m = $('#main'); m.innerHTML = html; window.scrollTo(0, 0);
+  if (S.anim) { S.anim = false; m.classList.remove('enter'); void m.offsetWidth; m.classList.add('enter'); }
+};
 const loading = () => paint('<div class="spin"></div>');
 
 /* ---------- router ---------- */
@@ -185,6 +190,7 @@ function route() {
   S.view = seg;
   setNav(r.nav || r.seg);
   loading();
+  S.anim = true;
   go(() => r.run(rest[0], rest[1]));
 }
 const addRoute = (seg, run, nav) => ROUTES.push({ seg, run, nav });
@@ -192,10 +198,13 @@ const addRoute = (seg, run, nav) => ROUTES.push({ seg, run, nav });
 /* ---------- Home ---------- */
 addRoute('home', async () => {
   const oggi = new Date(), da = new Date(oggi.getFullYear(), oggi.getMonth(), 1);
-  const [trend, recall, ordini] = await Promise.all([
+  const [trend, recall, ordini, { data: prom }] = await Promise.all([
     CrmInsights.trend(sb, da, oggi, { grain: 'month' }),
     CrmInsights.toRecall(sb),
-    sb.from('orders').select('id, numero, stato, totale, created_at, client_id').order('created_at', { ascending: false }).limit(6)
+    sb.from('orders').select('id, numero, stato, totale, created_at, client_id').order('created_at', { ascending: false }).limit(6),
+    (() => { let q = sb.from('reminders').select('*').eq('fatto', false)
+      .lte('due_at', new Date(Date.now() + 7 * 864e5).toISOString()).order('due_at').limit(20);
+      return isAdmin() || isViewer() ? q : q.eq('agent_id', S.me.id); })()
   ]);
   if (ordini.error) throw ordini.error;
   const t = (trend || [])[0] || {};
@@ -212,6 +221,9 @@ addRoute('home', async () => {
       ${kpi('Clienti', String(S.clients.filter(c => isAdmin() || isViewer() || mine(c)).length), isAdmin() || isViewer() ? 'in rete' : 'assegnati a te')}
       ${kpi('Da richiamare', String((recall || []).length), 'oltre il ritmo abituale', recall?.length ? 'orange' : '')}
     </div>
+    <div class="group"><h3>Promemoria · prossimi 7 giorni</h3><div class="inset" id="promList">
+      ${(prom || []).map(r => rigaProm(r, true)).join('') || '<div class="empty">Niente in agenda. Aggiungi promemoria e appuntamenti dalla scheda cliente.</div>'}
+    </div></div>
     <div class="group"><h3>Da richiamare</h3><div class="inset">
       ${(recall || []).slice(0, 6).map(r => rowLink(`#/cliente/${r.client_id}`, r.nome,
         `Ultimo ordine ${r.giorni} gg fa · ritmo ${Math.round(r.intervallo_medio || 0)} gg`,
@@ -223,6 +235,7 @@ addRoute('home', async () => {
         `${nome(o.client_id)} · ${dmy(o.created_at)}`, `<span class="mono">${eur(o.totale)}</span>${pill(o.stato)}`, false)).join('')
         || '<div class="empty">Nessun ordine.</div>'}
     </div></div>`);
+  bindProm($('#promList'));
 });
 const kpi = (l, v, n, tone = '') =>
   `<div class="kpi"><span class="l">${esc(l)}</span><span class="v mono">${esc(v)}</span>
@@ -243,47 +256,70 @@ async function ensureClients(force) {
 
 addRoute('clienti', async () => {
   await ensureClients(true);
+  const { data: ords } = await sb.from('orders').select('client_id, created_at').neq('stato', 'annullato');
+  const last = {};
+  (ords || []).forEach(o => { if (!last[o.client_id] || o.created_at > last[o.client_id]) last[o.client_id] = o.created_at; });
+  const F = S.filtro;
   const draw = () => {
-    const q = S.filtro.q.toLowerCase(), set = S.filtro.set;
+    const q = F.q.toLowerCase(), set = F.set;
     const list = S.clients.filter(c => {
+      if (F.agente && c.agent_id !== F.agente) return false;
+      if (F.stato && c.stato !== F.stato) return false;
       if (set === 'miei' && !mine(c)) return false;
       if (set === 'prospect' && !['prospect', 'contattato', 'trattativa'].includes(c.stato)) return false;
       if (!q) return true;
       return [c.ragione_sociale, c.insegna, c.zona, c.citta, c.stato].join(' ').toLowerCase().includes(q);
     });
+    const nm = c => (c.insegna || c.ragione_sociale || '').toLowerCase();
+    if (F.sort === 'ordine') list.sort((a, b) => (last[b.id] || '').localeCompare(last[a.id] || '') || nm(a).localeCompare(nm(b)));
+    else if (F.sort === 'recenti') list.sort((a, b) => (b.created_at || '').localeCompare(a.created_at || ''));
+    else list.sort((a, b) => nm(a).localeCompare(nm(b), 'it'));
     $('#lista').innerHTML = list.map(c => rowLink(`#/cliente/${c.id}`, c.insegna || c.ragione_sociale,
-      [lbl(c.tipologia), c.zona || c.citta].filter(Boolean).join(' · '),
+      [lbl(c.tipologia), c.zona || c.citta, F.sort === 'ordine' ? (last[c.id] ? 'ultimo ordine ' + dmy(last[c.id]) : 'mai ordinato') : null].filter(Boolean).join(' · '),
       `<span class="tags">${pill(c.stato)}<span class="pill">${esc(S.agents[c.agent_id]?.nome?.split(' ')[0] || '—')}</span></span>`)).join('')
       || '<div class="empty">Nessun cliente con questi filtri.</div>';
     $('#cnt').textContent = list.length + ' clienti';
   };
-  paint(`<div class="bar"><h1>Clienti</h1>
-      <button class="btn sm" id="nuovo">${svg('piu', 16)} Nuovo</button></div>
+  paint(`<div class="bar"><h1>Clienti</h1><span style="flex:1"></span>
+      ${isViewer() ? '' : `<button class="btn sm" id="nuovo">${svg('piu', 16)} Nuovo</button>`}</div>
     <div class="search">${svg('cerca', 16)}<label class="sr" for="q">Cerca clienti</label>
       <input id="q" type="search" placeholder="Nome, zona, stato" value="${esc(S.filtro.q)}"></div>
     <div class="seg" style="margin:10px 0">
       ${[['tutti', 'Tutti'], ['miei', 'I miei'], ['prospect', 'Da lavorare']].map(([k, l]) =>
         `<button data-set="${k}" class="${S.filtro.set === k ? 'on' : ''}">${l}</button>`).join('')}</div>
+    <div class="filtri">
+      <select id="fAg" aria-label="Agente"><option value="">Tutti gli agenti</option>
+        ${Object.values(S.agents).filter(a => a.attivo && a.ruolo !== 'viewer').map(a =>
+          `<option value="${a.id}" ${F.agente === a.id ? 'selected' : ''}>${esc(a.nome)}</option>`).join('')}</select>
+      <select id="fSt" aria-label="Stato"><option value="">Tutti gli stati</option>
+        ${STATI.map(x => `<option value="${x}" ${F.stato === x ? 'selected' : ''}>${lbl(x)}</option>`).join('')}</select>
+      <select id="fSo" aria-label="Ordina per">
+        ${[['nome', 'Nome A–Z'], ['ordine', 'Ultimo ordine'], ['recenti', 'Inseriti di recente']].map(([k, l]) =>
+          `<option value="${k}" ${F.sort === k ? 'selected' : ''}>${l}</option>`).join('')}</select>
+    </div>
     <div class="sub" id="cnt" style="padding:2px 4px 8px"></div>
     <div class="inset" id="lista"></div>`);
   $('#q').addEventListener('input', e => { S.filtro.q = e.target.value; draw(); });
+  [['#fAg', 'agente'], ['#fSt', 'stato'], ['#fSo', 'sort']].forEach(([id, k]) =>
+    $(id).addEventListener('change', e => { F[k] = e.target.value; draw(); }));
   $('.seg').addEventListener('click', e => {
     const b = e.target.closest('[data-set]'); if (!b) return;
     S.filtro.set = b.dataset.set;
     document.querySelectorAll('[data-set]').forEach(x => x.classList.toggle('on', x === b));
     draw();
   });
-  $('#nuovo').addEventListener('click', () => (location.hash = '#/cliente/nuovo'));
+  $('#nuovo')?.addEventListener('click', () => (location.hash = '#/cliente/nuovo'));
   draw();
 });
 
 addRoute('cliente', async (id) => {
   if (id === 'nuovo') return editCliente(null);
-  const [{ data: c, error }, { data: ct }, storico, sugg, { data: diario }, { data: storicoAltrove }] = await Promise.all([
+  const [{ data: c, error }, { data: ct }, storico, sugg, { data: prom }, { data: diario }, { data: storicoAltrove }] = await Promise.all([
     sb.from('clients').select('*').eq('id', id).single(),
     sb.from('client_contacts').select('*').eq('client_id', id).order('principale', { ascending: false }),
     CrmInsights.orderHistory(sb, id),
     CrmInsights.suggest(sb, id, 5).catch(() => []),
+    sb.from('reminders').select('*').eq('client_id', id).eq('fatto', false).order('due_at'),
     sb.from('activities').select('*').eq('client_id', id).order('data', { ascending: false }).order('created_at', { ascending: false }).limit(30),
     sb.from('client_contacts').select('nome,cognome,ruolo,data_inizio,data_fine,client_id,clients(insegna,ragione_sociale)')
       .neq('client_id', id).not('data_fine', 'is', null).order('data_fine', { ascending: false }).limit(500)
@@ -305,8 +341,8 @@ addRoute('cliente', async (id) => {
       <a href="#/clienti" class="btn line sm" aria-label="Clienti">‹<span class="hide-m">&nbsp;Clienti</span></a>
       <span style="flex:1"></span>
       ${ed ? `<button class="btn line sm" id="att">Attività</button>
-              <button class="btn line sm" id="mod">Modifica</button>
-              <button class="btn sm" id="ord">Nuovo ordine</button>` : '<span class="pill">Sola lettura</span>'}
+              <button class="btn line sm" id="mod">Modifica</button>` : '<span class="pill">Sola lettura</span>'}
+      ${canOrder(c) ? '<button class="btn sm" id="ord">Nuovo ordine</button>' : ''}
     </div>
     <div class="row" style="padding:0 4px 12px;border:0;align-items:flex-start">
       <span class="av" style="width:58px;height:58px;border-radius:15px;font-size:19px;background:var(--accent);color:#fff">
@@ -319,13 +355,11 @@ addRoute('cliente', async (id) => {
           <span class="pill">${esc(ag?.nome || '—')}</span></span>
       </span>
     </div>
-    <div class="inset" style="display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:var(--sep)">
+    <div class="inset quick">
       ${[['tel', 'Chiama', c.telefono ? 'tel:' + c.telefono : ''], ['chat', 'WhatsApp', waLink(c, ct)],
          ['pin', 'Mappa', mapsLink(c)], ['mail', 'Email', c.email ? 'mailto:' + c.email : '']]
-        .map(([i, l, href]) => `<a href="${href || '#'}" ${href ? '' : 'aria-disabled="true"'}
-          style="background:var(--card);min-height:62px;display:flex;flex-direction:column;align-items:center;
-          justify-content:center;gap:4px;font-size:12px;font-weight:600;${href ? '' : 'opacity:.4;pointer-events:none'}">
-          ${svg(i, 21)}${l}</a>`).join('')}
+        .map(([i, l, href]) => `<a href="${href || '#'}" ${href ? '' : 'aria-disabled="true" class="off"'}>${svg(i, 21)}${l}</a>`).join('')}
+      <button type="button" id="appt" ${canOrder(c) ? '' : 'class="off"'}>${svg('cal', 21)}Agenda</button>
     </div>
     <div class="group"><h3>Referenti</h3><div class="inset">
       ${(ct || []).filter(p => !p.data_fine).map(p => `<div class="row">
@@ -349,6 +383,20 @@ addRoute('cliente', async (id) => {
       <div class="row"><label>Sconto concordato</label>
         <span class="v mono" style="font-weight:700;color:${c.sconto_concordato_pct ? 'var(--green)' : 'var(--fg2)'}">${c.sconto_concordato_pct ? c.sconto_concordato_pct + '%' : 'Nessuno'}</span></div>
     </div></div>
+    <div class="group"><h3>Profilo carta vini</h3><div class="inset">
+      ${kv('Fascia', [lbl(c.fascia), c.coperti ? c.coperti + ' coperti' : ''].filter(Boolean).join(' · '))}
+      ${kv('Referenze in carta', c.n_referenze_carta)}
+      ${kv('Prezzo medio / ricarico', [c.prezzo_medio_carta ? eur(c.prezzo_medio_carta) : null,
+           c.ricarico_medio ? c.ricarico_medio + '×' : null].filter(Boolean).join(' · '))}
+      ${kv('Al calice', c.vino_calice ? [c.n_etichette_calice ? c.n_etichette_calice + ' etichette' : 'sì', c.sistema_mescita].filter(Boolean).join(' · ') : 'No')}
+      ${kv('Visite', c.orari_visita)}${kv('Consegna', c.finestra_consegna)}
+      ${chipsRow('Stili e territori', [].concat(c.tipologie_pref || [], c.stili_pref || [], c.regioni_pref || []))}
+      ${c.descrizione ? `<div class="row col"><label>Descrizione</label><span>${esc(c.descrizione)}</span></div>` : ''}
+    </div></div>
+    <div class="group"><h3 class="h3act"><span>Promemoria e appuntamenti</span>
+      ${canOrder(c) ? `<button class="btn line sm" id="promNew">${svg('piu', 14)} Aggiungi</button>` : ''}</h3><div class="inset" id="promList">
+      ${(prom || []).map(rigaProm).join('') || '<div class="empty">Nessun promemoria aperto.</div>'}
+    </div></div>
     <div class="group"><h3>Note / Diario</h3><div class="inset">
       ${c.note ? `<div class="row col"><label>Nota fissa</label><span>${esc(c.note)}</span></div>` : ''}
       ${(diario || []).map(a => `<div class="row col">
@@ -363,16 +411,27 @@ addRoute('cliente', async (id) => {
         <span class="mono">${eur(s.prezzo)}</span>${pill(s.disponibilita)}</div>`).join('')
         || '<div class="empty">Ancora pochi dati per suggerire referenze.</div>'}
     </div></div>
-    <div class="group"><h3>Storico ordini</h3><div class="inset">
+    <div class="group"><h3 class="h3act"><span>Storico ordini</span>
+      ${canOrder(c) && (storico || []).some(o => o.stato !== 'annullato')
+        ? `<button class="btn line sm" id="rifai">${svg('rifai', 14)} Rifai ultimo ordine</button>` : ''}</h3><div class="inset">
       ${(storico || []).map(o => `<a href="#/ordine/${o.id}"><div class="row">
         <span style="flex:1;min-width:0"><span class="ttl mono">${esc(o.numero)}</span><br>
         <span class="sub">${dmy(o.inviato_at || o.created_at)} · ${bt(o)} bt · ${(o.order_items || []).length} referenze</span></span>
         <span class="mono">${eur(o.totale)}</span>${pill(o.stato)}${svg('chev', 14, 'chev')}</div></a>`).join('')
         || '<div class="empty">Nessun ordine registrato.</div>'}
     </div></div>`);
+  $('#ord')?.addEventListener('click', () => (location.hash = '#/ordine/nuovo/' + c.id));
+  $('#appt').addEventListener('click', () => nuovoPromemoria(c, 'appuntamento'));
+  $('#promNew')?.addEventListener('click', () => nuovoPromemoria(c, 'promemoria'));
+  bindProm($('#promList'));
+  $('#rifai')?.addEventListener('click', () => go(async () => {
+    const o = (storico || []).find(x => x.stato !== 'annullato');
+    if (!o || !confirm(`Creare una nuova bozza uguale all'ordine ${o.numero}?`)) return;
+    location.hash = '#/ordine/' + await duplicaOrdine(o.id);
+    toast('Nuova bozza creata da ' + o.numero);
+  }));
   if (ed) {
     $('#mod').addEventListener('click', () => editCliente(c, ct || []));
-    $('#ord').addEventListener('click', () => (location.hash = '#/ordine/nuovo/' + c.id));
     $('#att').addEventListener('click', () => nuovaAttivita(c, ct || []));
     document.querySelectorAll('[data-lascia]').forEach(b => b.addEventListener('click', () => go(async () => {
       const p = (ct || []).find(x => x.id === b.dataset.lascia);
@@ -400,6 +459,11 @@ function modal(inner) {
   const el = document.createElement('div');
   el.className = 'modal';
   el.innerHTML = `<div>${inner}</div>`;
+  el.remove = () => {                          // chiusura animata
+    if (el.classList.contains('out')) return;
+    el.classList.add('out');
+    setTimeout(() => Element.prototype.remove.call(el), 190);
+  };
   el.addEventListener('click', e => { if (e.target === el) el.remove(); });
   document.body.appendChild(el);
   return el;
@@ -499,8 +563,122 @@ function nuovaAttivita(c, ct) {
       follow_up_at: $('#af', m).value || null, esito: $('#ae', m).value.trim() || null
     });
     if (error) throw error;
+    const fu = $('#af', m).value;
+    if (fu) await sb.from('reminders').insert({ client_id: c.id, agent_id: S.me.id, tipo: 'promemoria',
+      due_at: new Date(fu + 'T09:00').toISOString(), testo: 'Follow-up: ' + ($('#ae', m).value.trim() || $('#at', m).value) });
     m.remove(); toast('Attività registrata'); S.clients = []; route();
   }));
+}
+
+/* ---------- Promemoria e appuntamenti ---------- */
+const hm = d => new Date(d).toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' });
+function rigaProm(r, conCliente) {
+  const late = new Date(r.due_at) < new Date();
+  const cli = conCliente ? S.clients.find(c => c.id === r.client_id) : null;
+  return `<div class="row prom${late ? ' late' : ''}" data-r="${r.id}">
+    <button class="chk" data-done="${r.id}" aria-label="Segna come fatto"></button>
+    <span style="flex:1;min-width:0">
+      <span class="ttl" style="font-size:15px">${cli ? `<a href="#/cliente/${cli.id}">${esc(cli.insegna || cli.ragione_sociale)}</a> · ` : ''}${esc(r.testo || (r.tipo === 'appuntamento' ? 'Appuntamento' : 'Promemoria'))}</span><br>
+      <span class="sub">${r.tipo === 'appuntamento' ? svg('cal', 12) + ' ' : ''}${dmy(r.due_at)} · ${hm(r.due_at)}${late ? ' · scaduto' : ''}${S.agents[r.agent_id] && S.agents[r.agent_id].id !== S.me.id ? ' · ' + esc(S.agents[r.agent_id].nome) : ''}</span></span>
+    ${r.tipo === 'appuntamento' ? `<a class="btn ghost sm" href="${gcalLink(r, cli || S.clients.find(c => c.id === r.client_id))}" target="_blank" rel="noopener" aria-label="Apri in Google Calendar">${svg('cal', 16)}</a>` : ''}
+  </div>`;
+}
+function bindProm(box) {
+  if (!box) return;
+  box.addEventListener('click', e => {
+    const b = e.target.closest('[data-done]'); if (!b) return;
+    go(async () => {
+      b.classList.add('on');
+      const { error } = await sb.from('reminders').update({ fatto: true }).eq('id', b.dataset.done);
+      if (error) { b.classList.remove('on'); throw error; }
+      const row = b.closest('.row'); row.classList.add('bye');
+      setTimeout(() => { row.remove(); if (!box.querySelector('.row')) box.innerHTML = '<div class="empty">Nessun promemoria aperto.</div>'; }, 260);
+      toast('Fatto ✓');
+    });
+  });
+}
+const icsDate = d => new Date(d).toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, '');
+function gcalLink(r, c) {
+  const a = new Date(r.due_at), b = new Date(a.getTime() + (r.durata_min || 60) * 60000);
+  const q = new URLSearchParams({ action: 'TEMPLATE', text: `${c?.insegna || c?.ragione_sociale || 'Cliente'} · ${r.testo || 'Appuntamento'}`,
+    dates: icsDate(a) + '/' + icsDate(b), details: `${CFG.nome} CRM`, location: [c?.indirizzo, c?.cap, c?.citta].filter(Boolean).join(', ') });
+  return 'https://calendar.google.com/calendar/render?' + q;
+}
+function scaricaIcs(r, c) {
+  const a = new Date(r.due_at), b = new Date(a.getTime() + (r.durata_min || 60) * 60000);
+  const t = s => String(s || '').replace(/[,;\\]/g, m => '\\' + m).replace(/\n/g, '\\n');
+  const ics = ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//Wine Alchemist//CRM//IT', 'BEGIN:VEVENT',
+    'UID:' + r.id + '@wa-crm', 'DTSTAMP:' + icsDate(new Date()), 'DTSTART:' + icsDate(a), 'DTEND:' + icsDate(b),
+    'SUMMARY:' + t(`${c.insegna || c.ragione_sociale} · ${r.testo || 'Appuntamento'}`),
+    'LOCATION:' + t([c.indirizzo, c.cap, c.citta].filter(Boolean).join(', ')),
+    'BEGIN:VALARM', 'TRIGGER:-PT30M', 'ACTION:DISPLAY', 'DESCRIPTION:Promemoria', 'END:VALARM',
+    'END:VEVENT', 'END:VCALENDAR'].join('\r\n');
+  const u = URL.createObjectURL(new Blob([ics], { type: 'text/calendar' }));
+  const l = Object.assign(document.createElement('a'), { href: u, download: 'appuntamento.ics' });
+  document.body.appendChild(l); l.click(); l.remove(); setTimeout(() => URL.revokeObjectURL(u), 2000);
+}
+function nuovoPromemoria(c, tipo) {
+  const dom = new Date(Date.now() + 864e5), ymd = d => d.toLocaleDateString('sv-SE');
+  const m = modal(`<div class="bar"><h2>${tipo === 'appuntamento' ? 'Fissa appuntamento' : 'Nuovo promemoria'}</h2><span style="flex:1"></span>
+      <button class="btn line sm" data-x>Chiudi</button></div>
+    <div class="sub" style="padding:0 4px 10px">${esc(c.insegna || c.ragione_sociale)}</div>
+    <div class="seg" style="margin-bottom:12px" id="rt">
+      <button data-t="appuntamento" class="${tipo === 'appuntamento' ? 'on' : ''}">Appuntamento</button>
+      <button data-t="promemoria" class="${tipo === 'promemoria' ? 'on' : ''}">Promemoria</button></div>
+    <div class="inset">
+      <div class="row"><label for="rd">Giorno</label><input id="rd" type="date" value="${ymd(dom)}"></div>
+      <div class="row"><label for="rh">Ora</label><input id="rh" type="time" value="${tipo === 'appuntamento' ? '15:00' : '09:00'}"></div>
+      <div class="row" id="rdur"><label for="rm">Durata</label><select id="rm">
+        ${[30, 45, 60, 90, 120].map(x => `<option value="${x}" ${x === 60 ? 'selected' : ''}>${x} min</option>`).join('')}</select></div>
+      <div class="row col"><label for="rx">Cosa</label>
+        <input id="rx" placeholder="${tipo === 'appuntamento' ? 'es. Degustazione nuove referenze' : 'es. Richiamare per riordino'}"></div>
+    </div>
+    <button class="btn" id="rsave" style="width:100%;margin-top:14px">Salva</button>
+    <div id="rcal" class="hide" style="margin-top:14px">
+      <div class="sub" style="padding:0 4px 8px">Salvato. Aggiungilo anche al tuo calendario:</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+        <a class="btn line" id="rg" target="_blank" rel="noopener">Google Calendar</a>
+        <button class="btn line" id="ri">Apple / Outlook</button></div></div>`);
+  let t = tipo;
+  const syncT = () => { $('#rdur', m).style.display = t === 'appuntamento' ? '' : 'none'; };
+  syncT();
+  m.querySelector('[data-x]').addEventListener('click', () => m.remove());
+  $('#rt', m).addEventListener('click', e => {
+    const b = e.target.closest('[data-t]'); if (!b) return;
+    t = b.dataset.t; m.querySelectorAll('[data-t]').forEach(x => x.classList.toggle('on', x === b)); syncT();
+  });
+  $('#rsave', m).addEventListener('click', () => go(async () => {
+    const d = $('#rd', m).value, h = $('#rh', m).value || '09:00';
+    if (!d) return toast('Scegli il giorno');
+    const b = $('#rsave', m); b.disabled = true;
+    const { data: r, error } = await sb.from('reminders').insert({
+      client_id: c.id, agent_id: S.me.id, tipo: t, due_at: new Date(`${d}T${h}`).toISOString(),
+      durata_min: t === 'appuntamento' ? +$('#rm', m).value : null, testo: $('#rx', m).value.trim() || null
+    }).select().single();
+    b.disabled = false;
+    if (error) throw error;
+    toast(t === 'appuntamento' ? 'Appuntamento salvato' : 'Promemoria salvato');
+    if (t !== 'appuntamento') { m.remove(); if (S.view === 'cliente' || S.view === 'home') route(); return; }
+    b.classList.add('hide'); $('#rcal', m).classList.remove('hide');
+    $('#rg', m).href = gcalLink(r, c);
+    $('#ri', m).addEventListener('click', () => scaricaIcs(r, c));
+    m.querySelector('[data-x]').onclick = () => { m.remove(); route(); };
+  }));
+}
+
+async function duplicaOrdine(id) {
+  const [{ data: o, error }, { data: righe }] = await Promise.all([
+    sb.from('orders').select('*').eq('id', id).single(), sb.from('order_items').select('*').eq('order_id', id)]);
+  if (error) throw error;
+  const ins = await sb.from('orders').insert({ client_id: o.client_id, agent_id: S.me.id, pagamento: o.pagamento,
+    sconto_cliente_pct: o.sconto_cliente_pct, note: o.note }).select().single();
+  if (ins.error) throw ins.error;
+  if ((righe || []).length) {
+    const r = await sb.from('order_items').insert(righe.map(i => ({
+      order_id: ins.data.id, wine_id: i.wine_id, qty: i.qty, sconto_pct: i.sconto_pct, qty_omaggio: i.qty_omaggio || 0 })));
+    if (r.error) toast('Alcune referenze non sono più ordinabili: controlla la bozza', 4500);
+  }
+  return ins.data.id;
 }
 
 /* ---------- Mappa ---------- */
@@ -609,7 +787,8 @@ const zoneOpts = (list, sel) => {
 };
 const inZona = (w, z) => !z || (z.startsWith('N:') ? nazW(w) === z.slice(2) : `R:${nazW(w)}|${w.regione || '—'}` === z);
 const nomeVino = w => `<span class="prod">${esc(w.produttore || '—')}</span>
-  <span class="wn">${tipoTag(w)}${esc(w.nome)}${w.annata ? ' <span class="ann">' + esc(w.annata) + '</span>' : ''}</span>`;
+  <span class="wn">${tipoTag(w)}${esc(w.nome)}${w.annata ? ' <span class="ann">' + esc(w.annata) + '</span>' : ''}</span>
+  ${w.vitigni ? `<span class="vit">${esc(w.vitigni)}</span>` : ''}`;
 const chipTipo = (t, on) => `<button class="chip ${on ? 'on' : ''}" data-tipo="${t}" style="--tp:${tcol(t)}"><i class="dot"></i>${t}</button>`;
 const CSVCOLS = ['codice', 'produttore', 'nome', 'annata', 'tipologia', 'formato_cl', 'regione', 'nazione',
   'zona_produzione', 'esclusiva', 'vendibile_milano', 'disponibilita', 'prezzo_listino', 'no_sconto',
@@ -680,7 +859,6 @@ addRoute('catalogo', async () => {
         <span style="flex:1;min-width:0">
           ${nomeVino(w)}
           <span class="sub">${esc([w.formato_cl ? w.formato_cl + ' cl' : null, w.zona_produzione].filter(Boolean).join(' · '))}</span>
-          ${w.vitigni ? `<span class="sub" style="display:block;font-style:italic">${esc(w.vitigni)}</span>` : ''}
           ${w.no_sconto || !w.vendibile_milano || w.gestione_giacenza ? `<span class="tags" style="margin-top:4px">
             ${w.no_sconto ? '<span class="pill">No sconto</span>' : ''}
             ${!w.vendibile_milano ? '<span class="pill perso">Fuori zona</span>' : ''}
@@ -701,14 +879,21 @@ addRoute('catalogo', async () => {
     <div class="seg" style="margin:10px 0">
       ${[['inventario', 'In inventario'], ['tutte', 'Tutte'], ['fuori', 'Escluse'], ['giacenza', 'A giacenza']]
         .map(([k, l]) => `<button data-set="${k}" class="${f.set === k ? 'on' : ''}">${l}</button>`).join('')}</div>
-    <div class="chips" style="margin-bottom:10px" id="tipi">
+    <div class="chips wide-only" style="margin-bottom:10px" id="tipi">
       ${TIPI.map(t => chipTipo(t, false)).join('')}</div>
-    <select id="zona" class="zona" aria-label="Filtra per zona">${zoneOpts(wines || [], '')}</select>
+    <div class="filtri f2"><select class="tipo-sel" id="tipoSel" aria-label="Tipologia"><option value="">Tutte le tipologie</option>
+      ${TIPI.map(t => `<option value="${t}" ${f.tipo === t ? 'selected' : ''}>${t[0].toUpperCase() + t.slice(1)}</option>`).join('')}</select>
+      <select id="zona" class="zona" aria-label="Filtra per zona">${zoneOpts(wines || [], '')}</select></div>
     <div class="sub" id="cnt" style="padding:2px 4px 8px"></div>
     <div class="inset" id="lista"></div>`);
 
   $('#q').addEventListener('input', e => { f.q = e.target.value; disegna(); });
   $('#zona').addEventListener('change', e => { f.zona = e.target.value; disegna(); });
+  $('#tipoSel').addEventListener('change', e => {
+    f.tipo = e.target.value;
+    document.querySelectorAll('[data-tipo]').forEach(x => x.classList.toggle('on', x.dataset.tipo === f.tipo));
+    disegna();
+  });
   $('.seg').addEventListener('click', e => {
     const b = e.target.closest('[data-set]'); if (!b) return;
     f.set = b.dataset.set;
@@ -719,6 +904,7 @@ addRoute('catalogo', async () => {
     const b = e.target.closest('[data-tipo]'); if (!b) return;
     f.tipo = f.tipo === b.dataset.tipo ? '' : b.dataset.tipo;
     document.querySelectorAll('[data-tipo]').forEach(x => x.classList.toggle('on', x.dataset.tipo === f.tipo));
+    $('#tipoSel').value = f.tipo;
     disegna();
   });
   $('#lista').addEventListener('click', e => {
@@ -949,13 +1135,13 @@ addRoute('ordine', async (id, extra) => {
     return `<div class="row tp" style="--tp:${tcol(w.tipologia)};${q ? 'background:var(--accent-tint)' : ''}">
       <span style="flex:1;min-width:0">
         ${nomeVino(w)}
-        <span class="sub">${esc([w.formato_cl ? w.formato_cl + ' cl' : null, w.vitigni].filter(Boolean).join(' · '))}</span><br>
+        <span class="sub">${esc([w.formato_cl ? w.formato_cl + ' cl' : null, w.zona_produzione].filter(Boolean).join(' · '))}</span><br>
         <span class="sub mono" style="font-weight:600">${eur(w.prezzo_listino)}
           <span style="color:${tono}">· ${esc(disp)}</span>
           ${w.no_sconto || w.disponibilita === 'assegnazione' ? '· no sconto' : ''}</span></span>
       ${editabile ? `<span class="step">
         <button data-dec="${w.id}" aria-label="Togli" ${q ? '' : 'disabled'}>−</button>
-        <span class="q">${q}</span>
+        <input class="q" data-qty="${w.id}" type="number" min="0" step="1" inputmode="numeric" value="${q}" aria-label="Quantità">
         <button data-inc="${w.id}" aria-label="Aggiungi">+</button></span>`
         : `<span class="mono">${q} bt</span>`}
     </div>`;
@@ -974,7 +1160,7 @@ addRoute('ordine', async (id, extra) => {
           <span class="sub mono">${net < lordo - 0.004 ? `<s>${eur(lordo)}</s> ` : ''}<b>${eur(net)}</b>${info ? ` <span style="color:var(--green)">${info}</span>` : ''}</span></span>
         ${editabile ? `<span class="step">
           <button data-dec="${w.id}" aria-label="Togli">−</button>
-          <span class="q">${q}</span>
+          <input class="q" data-qty="${w.id}" type="number" min="0" step="1" inputmode="numeric" value="${q}" aria-label="Quantità">
           <button data-inc="${w.id}" aria-label="Aggiungi">+</button></span>`
           : `<span class="mono">${q} bt</span>`}
       </div>
@@ -1004,6 +1190,7 @@ addRoute('ordine', async (id, extra) => {
     paint(`<div class="ord-layout">
       <div class="ord-header">
         <div class="bar acts"><a href="#/ordini" class="btn line sm" aria-label="Ordini">‹<span class="hide-m">&nbsp;Ordini</span></a><span style="flex:1"></span>
+          <button class="btn line sm" id="pdfOrd" aria-label="PDF">${svg('doc', 16)}<span class="hide-m">&nbsp;PDF</span></button>
           <button class="btn line sm" id="dup">Duplica</button>
           ${o.stato === 'bozza' && (isAdmin() || o.agent_id === S.me.id) ? '<button class="btn line sm" id="delOrd" style="color:var(--red)">Elimina</button>' : ''}
           <button class="btn line sm" id="mailOrd" aria-label="Email">${svg('mail', 16)}<span class="hide-m">&nbsp;Email</span></button>
@@ -1024,6 +1211,10 @@ addRoute('ordine', async (id, extra) => {
             ${editabile
               ? `<input id="scontoCli" type="number" min="0" max="100" step="0.5" inputmode="decimal" class="num-in" value="${f.sconto || 0}"> %`
               : `<span class="v mono">${f.sconto ? f.sconto + '%' : '—'}</span>`}</div>
+          <div class="row"><label for="oCons">Consegna richiesta</label>
+            <input id="oCons" type="date" value="${o.data_consegna || ''}" ${editabile ? '' : 'disabled'}></div>
+          <div class="row col"><label for="oNote">Note ordine</label>
+            <textarea id="oNote" rows="2" placeholder="es. consegna dopo le 15, fattura a nome di…" ${editabile ? '' : 'disabled'}>${esc(o.note || '')}</textarea></div>
           ${o.scade_at ? kv('Prenotazione valida fino al', dmy(o.scade_at)) : ''}
         </div>
       </div>
@@ -1032,9 +1223,11 @@ addRoute('ordine', async (id, extra) => {
         ${editabile ? `<div class="group" style="margin-top:0"><h3>Catalogo</h3>
           <div class="search">${svg('cerca', 16)}<label class="sr" for="cq">Cerca referenze</label>
             <input id="cq" type="search" placeholder="Produttore, vino, regione" value="${esc(f.q)}"></div>
-          <div class="chips" style="margin:8px 0" id="tipi">
+          <div class="chips wide-only" style="margin:8px 0" id="tipi">
             ${TIPI.filter(t => t !== 'accessorio').map(t => chipTipo(t, f.tipo === t)).join('')}</div>
-          <select id="zona" class="zona" aria-label="Filtra per zona">${zoneOpts(catalogo, f.zona)}</select>
+          <div class="filtri f2"><select class="tipo-sel" id="tipoSel" aria-label="Tipologia"><option value="">Tutte le tipologie</option>
+      ${TIPI.filter(t => t !== 'accessorio').map(t => `<option value="${t}" ${f.tipo === t ? 'selected' : ''}>${t[0].toUpperCase() + t.slice(1)}</option>`).join('')}</select>
+            <select id="zona" class="zona" aria-label="Filtra per zona">${zoneOpts(catalogo, f.zona)}</select></div>
           <div class="sub" style="padding:2px 4px 8px">${filtrati.length} referenze</div>
           <div class="inset">${gruppiCat(filtrati, rigaVino) || '<div class="empty">Nessuna referenza.</div>'}</div>
         </div>` : `<div class="group" style="margin-top:0"><h3>Referenze</h3><div class="inset">
@@ -1066,6 +1259,7 @@ addRoute('ordine', async (id, extra) => {
     window.scrollTo(0, y0); const oc = $('.ord-cart'); if (oc) oc.scrollTop = cy0;
     const zs = $('#zona');
     if (zs) zs.addEventListener('change', e => { f.zona = e.target.value; render(); });
+    $('#tipoSel')?.addEventListener('change', e => { f.tipo = e.target.value; render(); });
     $('#pag').addEventListener('change', e => go(async () => {
       const r = await sb.from('orders').update({ pagamento: e.target.value }).eq('id', o.id).select().single();
       if (r.error) throw r.error;
@@ -1073,8 +1267,17 @@ addRoute('ordine', async (id, extra) => {
     }));
     const sc = $('#scontoCli');
     if (sc) sc.addEventListener('change', e => go(() => applySconto(e.target.value)));
+    $('#main').onkeydown = e => { if (e.key === 'Enter' && e.target.matches('input.q, .num-in')) e.target.blur(); };
+    $('#main').onfocusin = e => { if (e.target.matches('input.q, .num-in')) e.target.select(); };
     $('#main').onchange = e => {
-      const t = e.target, id = t.dataset.rsc || t.dataset.rom; if (!id) return;
+      const t = e.target;
+      if (t.dataset.qty) {
+        const w = catalogo.find(x => x.id === t.dataset.qty); if (!w) return;
+        const n = Math.max(0, Math.round(Number(t.value) || 0));
+        if (n !== (items.get(w.id)?.qty || 0)) go(() => setQty(w, n));
+        return;
+      }
+      const id = t.dataset.rsc || t.dataset.rom; if (!id) return;
       const w = catalogo.find(x => x.id === id), it = items.get(id); if (!w || !it) return;
       go(() => t.dataset.rsc
         ? setRiga(w, { sconto_pct: Math.max(0, Math.min(100, Number(t.value) || 0)) })
@@ -1099,19 +1302,19 @@ addRoute('ordine', async (id, extra) => {
     $('#mailOrd').addEventListener('click', () => mailOrdine(o, [...items.values()], cli));
     $('#waOrd').addEventListener('click', () => waOrdine(o, [...items.values()], cli));
     $('#dup').addEventListener('click', () => go(async () => {
-      const ins = await sb.from('orders')
-        .insert({ client_id: o.client_id, agent_id: S.me.id, pagamento: o.pagamento, sconto_cliente_pct: o.sconto_cliente_pct }).select().single();
-      if (ins.error) throw ins.error;
-      const righe = [...items.values()];
-      if (righe.length) {
-        const r = await sb.from('order_items').insert(righe.map(i => ({
-          order_id: ins.data.id, wine_id: i.wine_id, qty: i.qty, sconto_pct: i.sconto_pct, qty_omaggio: i.qty_omaggio || 0
-        })));
-        if (r.error) throw r.error;
-      }
+      const nid = await duplicaOrdine(o.id);
       toast('Ordine duplicato in bozza');
-      location.hash = '#/ordine/' + ins.data.id;
+      location.hash = '#/ordine/' + nid;
     }));
+    $('#pdfOrd').addEventListener('click', () => pdfOrdine(o, [...items.values()], cli));
+    [['#oNote', 'note'], ['#oCons', 'data_consegna']].forEach(([id, k]) => {
+      const el = $(id); if (!el || el.disabled) return;
+      el.addEventListener('change', e => go(async () => {
+        const r = await sb.from('orders').update({ [k]: e.target.value.trim() || null }).eq('id', o.id).select().single();
+        if (r.error) throw r.error;
+        Object.assign(o, r.data); toast('Salvato');
+      }));
+    });
     const delB = $('#delOrd');
     if (delB) delB.addEventListener('click', () => go(async () => {
       if (!confirm(`Eliminare definitivamente la bozza ${o.numero}?`)) return;
@@ -1148,8 +1351,62 @@ function testoOrdine(o, items, cli) {
     o.omaggio_bt ? `Sconto merce: ${o.omaggio_bt} bt in omaggio` : '',
     `Totale (iva escl.): ${eur(o.totale)}`,
     o.porto_franco ? 'Porto franco' : 'Trasporto a carico del cliente',
-    `Pagamento: ${lbl(o.pagamento)}`
+    `Pagamento: ${lbl(o.pagamento)}`,
+    o.data_consegna ? `Consegna richiesta: ${dmy(o.data_consegna)}` : '',
+    o.note ? `Note: ${o.note}` : ''
   ].filter(Boolean).join('\n');
+}
+function pdfOrdine(o, items, cli) {
+  const w = window.open('', '_blank');
+  if (!w) return toast('Consenti i popup per generare il PDF');
+  const ag = S.agents[o.agent_id];
+  const righe = items.map(i => {
+    const paid = i.qty - (i.qty_omaggio || 0), net = paid * num(i.prezzo_unitario) * (1 - num(i.sconto_pct) / 100);
+    return `<tr><td>${esc(i.wine_label)}</td><td class="r">${i.qty}${i.qty_omaggio ? `<small>di cui ${i.qty_omaggio} omaggio</small>` : ''}</td>
+      <td class="r">${eur(i.prezzo_unitario)}</td><td class="r">${num(i.sconto_pct) ? num(i.sconto_pct) + '%' : '—'}</td><td class="r">${eur(net)}</td></tr>`;
+  }).join('');
+  const lordo = items.reduce((a, i) => a + i.qty * num(i.prezzo_unitario), 0);
+  w.document.write(`<!doctype html><html lang="it"><head><meta charset="utf-8"><title>Ordine ${esc(o.numero)}</title>
+  <style>
+    @page{size:A4;margin:16mm}*{box-sizing:border-box}
+    body{font:12px/1.45 -apple-system,"Helvetica Neue",Arial,sans-serif;color:#161614;margin:0}
+    header{display:flex;justify-content:space-between;align-items:flex-end;border-bottom:2px solid #161614;padding-bottom:10px;margin-bottom:18px}
+    .brand{font-size:20px;font-weight:800;letter-spacing:.18em}.muted{color:#6B6B66}
+    h1{font-size:15px;margin:0;font-weight:700}.grid{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-bottom:18px}
+    .box h3{font-size:9.5px;letter-spacing:.1em;text-transform:uppercase;color:#6B6B66;margin:0 0 4px}
+    table{width:100%;border-collapse:collapse}th{font-size:9.5px;letter-spacing:.08em;text-transform:uppercase;color:#6B6B66;text-align:left;border-bottom:1px solid #161614;padding:6px 4px}
+    td{padding:7px 4px;border-bottom:1px solid #E4E4DE;vertical-align:top}.r{text-align:right;white-space:nowrap}
+    small{display:block;color:#1F7A35;font-size:10px}
+    .tot{margin:14px 0 0 auto;width:280px}.tot div{display:flex;justify-content:space-between;padding:4px 0}
+    .tot .big{font-size:16px;font-weight:800;border-top:2px solid #161614;margin-top:6px;padding-top:8px}
+    .note{margin-top:22px;padding:10px 12px;background:#F4F4EF;border-radius:4px}
+    footer{margin-top:30px;font-size:10px;color:#6B6B66}
+  </style></head><body>
+  <header><div><div class="brand">${esc(CFG.nome.toUpperCase())}</div><div class="muted">Conferma d'ordine</div></div>
+    <div style="text-align:right"><h1>${esc(o.numero)}</h1><div class="muted">${dmy(o.inviato_at || o.created_at)} · ${esc(lbl(o.stato))}</div></div></header>
+  <div class="grid">
+    <div class="box"><h3>Cliente</h3><strong>${esc(cli.ragione_sociale || cli.insegna || '')}</strong>
+      ${cli.insegna && cli.ragione_sociale && cli.insegna !== cli.ragione_sociale ? `<br>${esc(cli.insegna)}` : ''}
+      <br>${esc([cli.indirizzo, [cli.cap, cli.citta].filter(Boolean).join(' ')].filter(Boolean).join(', '))}
+      ${cli.piva ? `<br>P.IVA ${esc(cli.piva)}` : ''}</div>
+    <div class="box"><h3>Condizioni</h3>Pagamento: ${esc(lbl(o.pagamento))}
+      ${o.data_consegna ? `<br>Consegna richiesta: ${dmy(o.data_consegna)}` : ''}
+      <br>${o.porto_franco ? 'Porto franco' : 'Trasporto a carico del cliente'}
+      ${ag ? `<br>Agente: ${esc(ag.nome)}` : ''}</div>
+  </div>
+  <table><thead><tr><th>Referenza</th><th class="r">Bt</th><th class="r">Listino</th><th class="r">Sconto</th><th class="r">Importo</th></tr></thead>
+    <tbody>${righe}</tbody></table>
+  <div class="tot">
+    ${lordo - num(o.imponibile) > 0.004 ? `<div><span>Totale listino</span><span>${eur(lordo)}</span></div><div><span>Sconti e omaggi</span><span>− ${eur(lordo - num(o.imponibile))}</span></div>` : ''}
+    <div><span>Imponibile</span><span>${eur(o.imponibile)}</span></div>
+    ${o.sconto_pagamento ? `<div><span>Sconto pagamento anticipato</span><span>− ${eur(o.sconto_pagamento)}</span></div>` : ''}
+    ${o.omaggio_bt ? `<div><span>Omaggio</span><span>${o.omaggio_bt} bt</span></div>` : ''}
+    <div class="big"><span>Totale IVA esclusa</span><span>${eur(o.totale)}</span></div>
+  </div>
+  ${o.note ? `<div class="note"><strong>Note:</strong> ${esc(o.note)}</div>` : ''}
+  <footer>Documento generato dal CRM ${esc(CFG.nome)} · prezzi IVA esclusa</footer>
+  <script>window.onload=()=>setTimeout(()=>window.print(),250)<\/script></body></html>`);
+  w.document.close();
 }
 const ORD_EMAIL_TO = ['ordini@winealchemist.it', 'info@winealchemist.it'];
 const ORD_WHATSAPP = '393914175784'; // Fabio
