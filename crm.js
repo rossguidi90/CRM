@@ -613,7 +613,7 @@ addRoute('catalogo', async () => {
       if (f.set === 'fuori' && w.in_inventario) return false;
       if (f.set === 'giacenza' && !w.gestione_giacenza) return false;
       if (!q) return true;
-      return [w.produttore, w.nome, w.annata, w.regione, w.zona_produzione].join(' ').toLowerCase().includes(q);
+      return [w.produttore, w.nome, w.annata, w.regione, w.zona_produzione, w.vitigni].join(' ').toLowerCase().includes(q);
     });
     $('#cnt').textContent = `${list.length} referenze · ${(wines || []).filter(w => w.in_inventario).length} in inventario`;
     $('#lista').innerHTML = list.slice(0, 400).map(w => {
@@ -622,6 +622,7 @@ addRoute('catalogo', async () => {
         <span style="flex:1;min-width:0">
           <span class="ttl">${esc(w.nome)}${w.annata ? ' <span class="sub">' + esc(w.annata) + '</span>' : ''}</span><br>
           <span class="sub">${esc([w.produttore, w.formato_cl ? w.formato_cl + ' cl' : null, w.regione].filter(Boolean).join(' · '))}</span>
+          ${w.vitigni ? `<br><span class="sub" style="font-style:italic">${esc(w.vitigni)}</span>` : ''}
           ${w.no_sconto ? '<span class="pill" style="margin-top:4px;display:inline-block">No sconto</span>' : ''}
           ${!w.vendibile_milano ? '<span class="pill perso" style="margin-top:4px;display:inline-block">Fuori zona</span>' : ''}
           ${w.gestione_giacenza ? `<span class="pill" style="margin-top:4px;display:inline-block">Giacenza ${s.disponibile ?? 0}</span>` : ''}
@@ -696,6 +697,7 @@ function schedaVino(w, s, done) {
     <div class="sub" style="margin:-8px 0 12px">${esc([w.produttore, w.annata, w.formato_cl ? w.formato_cl + ' cl' : null,
       w.zona_produzione, w.regione].filter(Boolean).join(' · '))}</div>
     <div class="inset">
+      ${kv('Vitigni', w.vitigni || '—')}
       ${kv('Prezzo di listino', eur(w.prezzo_listino))}
       ${kv('Disponibilità', lbl(w.disponibilita))}
       ${kv('Esclusiva', w.esclusiva)}
@@ -870,7 +872,8 @@ addRoute('ordine', async (id, extra) => {
     return `<div class="row" style="${q ? 'background:var(--accent-tint)' : ''}">
       <span style="flex:1;min-width:0">
         <span class="ttl" style="font-size:15px">${esc(w.nome)}${w.annata ? ' ' + esc(w.annata) : ''}</span><br>
-        <span class="sub">${esc([w.produttore, w.formato_cl ? w.formato_cl + ' cl' : null].filter(Boolean).join(' · '))}</span><br>
+        <span class="sub">${esc([w.produttore, w.formato_cl ? w.formato_cl + ' cl' : null, w.regione].filter(Boolean).join(' · '))}</span><br>
+        ${w.vitigni ? `<span class="sub" style="font-style:italic">${esc(w.vitigni)}</span><br>` : ''}
         <span class="sub mono" style="font-weight:600">${eur(w.prezzo_listino)}
           <span style="color:${tono}">· ${esc(disp)}</span>
           ${w.no_sconto || w.disponibilita === 'assegnazione' ? '· no sconto' : ''}</span></span>
@@ -901,7 +904,7 @@ addRoute('ordine', async (id, extra) => {
     const q = f.q.toLowerCase();
     const filtrati = editabile ? catalogo.filter(w =>
       (!f.tipo || w.tipologia === f.tipo) &&
-      (!q || [w.produttore, w.nome, w.annata, w.regione].join(' ').toLowerCase().includes(q))) : [];
+      (!q || [w.produttore, w.nome, w.annata, w.regione, w.vitigni].join(' ').toLowerCase().includes(q))) : [];
     const bt = [...items.values()].reduce((a, i) => a + i.qty, 0);
     const azioni = [];
     if (editabile) azioni.push(['inviato', 'Invia ordine', 'btn']);
