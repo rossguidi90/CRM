@@ -78,7 +78,8 @@ const CrmClientForm = (() => {
       { k: 'pec', l: 'PEC', t: 'email' },
       { k: 'sede_legale', l: 'Sede legale', t: 'text' },
       { k: 'termini_pagamento', l: 'Termini di pagamento', t: 'list', o: OPT.pagamento },
-      { k: 'modalita_pagamento', l: 'Note pagamento', t: 'text' }
+      { k: 'modalita_pagamento', l: 'Note pagamento', t: 'text' },
+      { k: 'sconto_concordato_pct', l: 'Sconto concordato (%)', t: 'number', placeholder: 'es. 5', min: 0, max: 100 }
     ]},
     { id: 'note', title: 'Note', fields: [{ k: 'note', l: 'Note', t: 'textarea' }] }
   ];

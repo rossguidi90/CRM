@@ -322,6 +322,12 @@ addRoute('cliente', async (id) => {
         ${p.email ? `<a class="btn ghost sm" href="mailto:${esc(p.email)}" aria-label="Email ${esc(p.nome)}">${svg('mail', 16)}</a>` : ''}
       </div>`).join('') || '<div class="empty">Nessun referente registrato.</div>'}
     </div></div>
+    <div class="group"><h3>Condizioni commerciali</h3><div class="inset">
+      ${kv('Termini di pagamento', lbl(c.termini_pagamento) || '—')}
+      ${c.modalita_pagamento ? kv('Note pagamento', c.modalita_pagamento) : ''}
+      <div class="row"><label>Sconto concordato</label>
+        <span class="v mono" style="font-weight:700;color:${c.sconto_concordato_pct ? 'var(--green)' : 'var(--fg2)'}">${c.sconto_concordato_pct ? c.sconto_concordato_pct + '%' : 'Nessuno'}</span></div>
+    </div></div>
     <div class="group"><h3>Profilo carta vini</h3><div class="inset">
       ${kv('Fascia', [lbl(c.fascia), c.coperti ? c.coperti + ' coperti' : ''].filter(Boolean).join(' · '))}
       ${kv('Referenze in carta', c.n_referenze_carta)}
@@ -329,7 +335,6 @@ addRoute('cliente', async (id) => {
            c.ricarico_medio ? c.ricarico_medio + '×' : null].filter(Boolean).join(' · '))}
       ${kv('Al calice', c.vino_calice ? [c.n_etichette_calice ? c.n_etichette_calice + ' etichette' : 'sì', c.sistema_mescita].filter(Boolean).join(' · ') : 'No')}
       ${kv('Visite', c.orari_visita)}${kv('Consegna', c.finestra_consegna)}
-      ${kv('Pagamento', c.termini_pagamento)}
       ${chipsRow('Stili e territori', [].concat(c.tipologie_pref || [], c.stili_pref || [], c.regioni_pref || []))}
       ${c.descrizione ? `<div class="row col"><label>Descrizione</label><span>${esc(c.descrizione)}</span></div>` : ''}
     </div></div>
@@ -822,7 +827,7 @@ addRoute('ordine', async (id, extra) => {
   const items = new Map((rows || []).map(i => [i.wine_id, i]));
   const editabile = o.stato === 'bozza' && (isAdmin() || o.agent_id === S.me.id);
   const passo = () => 1; // singola bottiglia per click, sempre (nessun vincolo di cartone)
-  const f = { q: '', tipo: '' };
+  const f = { q: '', tipo: '', sconto: cli.sconto_concordato_pct != null ? cli.sconto_concordato_pct : 0 };
 
   async function setQty(w, q) {
     const it = items.get(w.id);
@@ -835,9 +840,23 @@ addRoute('ordine', async (id, extra) => {
       if (r.error) throw r.error;
       it.qty = q;
     } else if (q > 0) {
-      const r = await sb.from('order_items').insert({ order_id: o.id, wine_id: w.id, qty: q }).select().single();
+      const r = await sb.from('order_items').insert({ order_id: o.id, wine_id: w.id, qty: q, sconto_pct: f.sconto || 0 }).select().single();
       if (r.error) throw r.error;
       items.set(w.id, r.data);
+    }
+    const fresh = await sb.from('orders').select('*').eq('id', o.id).single();
+    if (fresh.data) Object.assign(o, fresh.data);
+    render();
+  }
+
+  async function applySconto(val) {
+    f.sconto = Math.max(0, Math.min(100, Number(val) || 0));
+    if (items.size) {
+      const r = await sb.from('order_items').update({ sconto_pct: f.sconto }).eq('order_id', o.id);
+      if (r.error) throw r.error;
+      const rows = await sb.from('order_items').select('*').eq('order_id', o.id);
+      items.clear();
+      (rows.data || []).forEach(i => items.set(i.wine_id, i));
     }
     const fresh = await sb.from('orders').select('*').eq('id', o.id).single();
     if (fresh.data) Object.assign(o, fresh.data);
@@ -863,10 +882,24 @@ addRoute('ordine', async (id, extra) => {
     </div>`;
   };
 
+  const rigaCarrello = w => {
+    const it = items.get(w.id), q = it ? it.qty : 0;
+    return `<div class="cart-row">
+      <span style="flex:1;min-width:0">
+        <span class="ttl" style="font-size:14px;display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(w.nome)}${w.annata ? ' ' + esc(w.annata) : ''}</span>
+        <span class="sub mono">${eur((w.prezzo_listino || 0) * q)}</span></span>
+      ${editabile ? `<span class="step">
+        <button data-dec="${w.id}" aria-label="Togli">−</button>
+        <span class="q">${q}</span>
+        <button data-inc="${w.id}" aria-label="Aggiungi">+</button></span>`
+        : `<span class="mono">${q} bt</span>`}
+    </div>`;
+  };
+
   function render() {
     const scelti = catalogo.filter(w => items.has(w.id));
     const q = f.q.toLowerCase();
-    const resto = editabile ? catalogo.filter(w => !items.has(w.id) &&
+    const filtrati = editabile ? catalogo.filter(w =>
       (!f.tipo || w.tipologia === f.tipo) &&
       (!q || [w.produttore, w.nome, w.annata, w.regione].join(' ').toLowerCase().includes(q))) : [];
     const bt = [...items.values()].reduce((a, i) => a + i.qty, 0);
@@ -875,55 +908,71 @@ addRoute('ordine', async (id, extra) => {
     if (isAdmin() && o.stato === 'inviato') azioni.push(['confermato', 'Conferma', 'btn'], ['annullato', 'Annulla', 'btn ghost']);
     if (isAdmin() && o.stato === 'confermato') azioni.push(['evaso', 'Segna evaso', 'btn']);
 
-    paint(`<div class="bar"><a href="#/ordini" class="btn line sm">Ordini</a><span style="flex:1"></span>
-        <button class="btn line sm" id="share">Condividi</button>${pill(o.stato)}</div>
-      <h1 class="mono" style="font-size:22px">${esc(o.numero)}</h1>
-      <div class="inset" style="margin-top:12px">
-        <a href="#/cliente/${cli.id}"><div class="row">
-          <span class="av">${esc(ini(cli.insegna || cli.ragione_sociale || '?'))}</span>
-          <span style="flex:1;min-width:0"><span class="ttl">${esc(cli.insegna || cli.ragione_sociale || '—')}</span><br>
-            <span class="sub">${esc([cli.indirizzo, cli.finestra_consegna ? 'consegna ' + cli.finestra_consegna : null].filter(Boolean).join(' · '))}</span></span>
-          ${svg('chev', 14, 'chev')}</div></a>
-        <div class="row"><label for="pag">Pagamento</label>
-          <select id="pag" ${editabile ? '' : 'disabled'}>
-            ${['anticipato', 'bonifico_30', 'riba_60'].map(p =>
-              `<option value="${p}" ${o.pagamento === p ? 'selected' : ''}>${lbl(p)}</option>`).join('')}
-          </select></div>
-        ${o.scade_at ? kv('Prenotazione valida fino al', dmy(o.scade_at)) : ''}
+    paint(`<div class="ord-layout">
+      <div class="ord-header">
+        <div class="bar"><a href="#/ordini" class="btn line sm">Ordini</a><span style="flex:1"></span>
+          <button class="btn line sm" id="share">Condividi</button>${pill(o.stato)}</div>
+        <h1 class="mono" style="font-size:22px">${esc(o.numero)}</h1>
+        <div class="inset" style="margin-top:12px">
+          <a href="#/cliente/${cli.id}"><div class="row">
+            <span class="av">${esc(ini(cli.insegna || cli.ragione_sociale || '?'))}</span>
+            <span style="flex:1;min-width:0"><span class="ttl">${esc(cli.insegna || cli.ragione_sociale || '—')}</span><br>
+              <span class="sub">${esc([cli.indirizzo, cli.finestra_consegna ? 'consegna ' + cli.finestra_consegna : null].filter(Boolean).join(' · '))}</span></span>
+            ${svg('chev', 14, 'chev')}</div></a>
+          <div class="row"><label for="pag">Pagamento</label>
+            <select id="pag" ${editabile ? '' : 'disabled'}>
+              ${['anticipato', 'bonifico_30', 'riba_60'].map(p =>
+                `<option value="${p}" ${o.pagamento === p ? 'selected' : ''}>${lbl(p)}</option>`).join('')}
+            </select></div>
+          <div class="row"><label for="scontoCli">Sconto cliente</label>
+            ${editabile
+              ? `<input id="scontoCli" type="number" min="0" max="100" step="0.5" inputmode="decimal" style="text-align:right;width:64px" value="${f.sconto || 0}"> %`
+              : `<span class="v mono">${f.sconto ? f.sconto + '%' : '—'}</span>`}</div>
+          ${o.scade_at ? kv('Prenotazione valida fino al', dmy(o.scade_at)) : ''}
+        </div>
       </div>
 
-      <div class="group"><h3>Nel carrello${bt ? ' · ' + bt + ' bottiglie' : ''}</h3><div class="inset">
-        ${scelti.map(rigaVino).join('') || '<div class="empty">Nessuna referenza. Aggiungile qui sotto.</div>'}
-      </div></div>
+      <div class="ord-main">
+        ${editabile ? `<div class="group" style="margin-top:0"><h3>Catalogo</h3>
+          <div class="search">${svg('cerca', 16)}<label class="sr" for="cq">Cerca referenze</label>
+            <input id="cq" type="search" placeholder="Produttore, vino, regione" value="${esc(f.q)}"></div>
+          <div class="chips" style="margin:8px 0" id="tipi">
+            ${TIPI.filter(t => t !== 'accessorio').map(t =>
+              `<button class="chip ${f.tipo === t ? 'on' : ''}" data-tipo="${t}">${t}</button>`).join('')}</div>
+          <div class="inset">${filtrati.slice(0, 80).map(rigaVino).join('') || '<div class="empty">Nessuna referenza.</div>'}
+          ${filtrati.length > 80 ? '<div class="empty">Mostrate le prime 80: affina la ricerca.</div>' : ''}</div>
+        </div>` : `<div class="group" style="margin-top:0"><h3>Referenze</h3><div class="inset">
+          ${scelti.map(rigaVino).join('') || '<div class="empty">Nessuna referenza.</div>'}
+        </div></div>`}
+      </div>
 
-      ${editabile ? `<div class="group"><h3>Catalogo</h3>
-        <div class="search">${svg('cerca', 16)}<label class="sr" for="cq">Cerca referenze</label>
-          <input id="cq" type="search" placeholder="Produttore, vino, regione" value="${esc(f.q)}"></div>
-        <div class="chips" style="margin:8px 0" id="tipi">
-          ${TIPI.filter(t => t !== 'accessorio').map(t =>
-            `<button class="chip ${f.tipo === t ? 'on' : ''}" data-tipo="${t}">${t}</button>`).join('')}</div>
-        <div class="inset">${resto.slice(0, 80).map(rigaVino).join('') || '<div class="empty">Nessuna referenza.</div>'}
-        ${resto.length > 80 ? '<div class="empty">Mostrate le prime 80: affina la ricerca.</div>' : ''}</div>
-      </div>` : ''}
-
-      <div class="group"><h3>Riepilogo</h3><div class="inset">
-        ${kv('Imponibile', eur(o.imponibile))}
-        ${o.sconto_pagamento ? kv('Sconto pagamento anticipato', '− ' + eur(o.sconto_pagamento)) : ''}
-        ${o.omaggio_bt ? kv('Sconto merce', `${o.omaggio_bt} bt omaggio · ${esc(items.get(o.omaggio_wine_id)?.wine_label || '')}`) : ''}
-        ${kv('Trasporto', o.porto_franco ? 'Porto franco' : `Sotto i ${eur(400)}: trasporto a carico del cliente`)}
-        <div class="row"><label>Totale</label><span class="v mono" style="font-size:19px;font-weight:700;color:var(--fg)">${eur(o.totale)}</span></div>
-      </div></div>
-      ${azioni.length ? `<div class="sheet">
-        <span style="flex:1"><span class="sub">${bt} bt · ${items.size} referenze</span><br>
-          <span class="mono" style="font-size:20px;font-weight:700">${eur(o.totale)}</span></span>
-        ${azioni.map(([st, l, c]) => `<button class="${c}" data-go="${st}">${l}</button>`).join('')}
-      </div>` : ''}`);
+      <aside class="ord-cart">
+        <div class="group" style="margin-top:0"><h3>Carrello${bt ? ' · ' + bt + ' bottiglie' : ''}</h3><div class="inset">
+          ${scelti.map(rigaCarrello).join('') || '<div class="cart-empty">Nessuna referenza selezionata.</div>'}
+        </div></div>
+        <div class="group"><h3>Riepilogo</h3><div class="inset">
+          ${kv('Imponibile', eur(o.imponibile))}
+          ${o.sconto_pagamento ? kv('Sconto pagamento anticipato', '− ' + eur(o.sconto_pagamento)) : ''}
+          ${o.omaggio_bt ? kv('Sconto merce', `${o.omaggio_bt} bt omaggio · ${esc(items.get(o.omaggio_wine_id)?.wine_label || '')}`) : ''}
+          ${kv('Trasporto', o.porto_franco ? 'Porto franco' : `Sotto i ${eur(400)}: trasporto a carico del cliente`)}
+          <div class="row"><label>Totale</label><span class="v mono" style="font-size:19px;font-weight:700;color:var(--fg)">${eur(o.totale)}</span></div>
+        </div></div>
+        ${azioni.length ? azioni.map(([st, l, c]) => `<button class="${c}" style="width:100%;margin-bottom:8px" data-go="${st}">${l}</button>`).join('') : ''}
+      </aside>
+    </div>
+    ${azioni.length ? `<div class="sheet hide-desktop">
+      <span style="flex:1"><span class="sub">${bt} bt · ${items.size} referenze</span><br>
+        <span class="mono" style="font-size:20px;font-weight:700">${eur(o.totale)}</span></span>
+      <button class="${azioni[0][2]}" data-go="${azioni[0][0]}">${azioni[0][1]}</button>
+    </div>` : ''}`);
 
     $('#pag').addEventListener('change', e => go(async () => {
       const r = await sb.from('orders').update({ pagamento: e.target.value }).eq('id', o.id).select().single();
       if (r.error) throw r.error;
       Object.assign(o, r.data); render();
     }));
+    const sc = $('#scontoCli');
+    if (sc) sc.addEventListener('change', e => go(() => applySconto(e.target.value)));
     const cq = $('#cq');
     if (cq) {
       if (f.q) { cq.focus(); cq.setSelectionRange(f.q.length, f.q.length); }
