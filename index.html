@@ -261,8 +261,7 @@ a .row:active,button.row:active{background:var(--fill)}
 :root[data-theme=dark] .tipo{color:color-mix(in srgb,var(--tp) 55%,#fff);background:color-mix(in srgb,var(--tp) 28%,transparent)}
 @media (prefers-color-scheme:dark){:root:not([data-theme=light]) .tipo{color:color-mix(in srgb,var(--tp) 55%,#fff);background:color-mix(in srgb,var(--tp) 28%,transparent)}}
 :root[data-theme=dark] .inset,:root[data-theme=dark] .kpi,:root[data-theme=dark] .card{box-shadow:0 1px 0 rgba(255,255,255,.03) inset,0 6px 20px rgba(0,0,0,.25)}
-.modal{backdrop-filter:blur(3px)}
-.modal>div{background:var(--bg)}
+.modal>div{background:var(--bg);isolation:isolate;position:relative}
 
 /* ---- avatar colorati per agente ---- */
 .av.ag{background:color-mix(in srgb,var(--ac) 16%,var(--card));color:color-mix(in srgb,var(--ac) 80%,var(--fg))}
