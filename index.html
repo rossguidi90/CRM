@@ -161,16 +161,41 @@ window.WA_CONFIG = {
   cartone: 6            // passo dello stepper quantità
 };
 </script>
+<script src="crm_map.js?v=3"></script>
+<script src="crm_insights.js?v=3"></script>
+<script src="crm_client_form.js?v=3"></script>
+<script src="crm.js?v=3"></script>
 <script>
-  // In demo carica solo il backend locale; altrimenti il client Supabase.
-  document.write(window.WA_CONFIG.demo
-    ? '<scr'+'ipt src="crm_demo.js"></scr'+'ipt>'
-    : '<scr'+'ipt src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></scr'+'ipt>');
+// Diagnostica: se dopo 9 secondi l'app non è partita, dice cosa manca invece di girare a vuoto.
+(function () {
+  var errori = [];
+  window.addEventListener('error', function (e) {
+    errori.push((e.message || 'errore') + ' · ' + String(e.filename || '').split('/').pop() + ':' + (e.lineno || 0));
+  }, true);
+  setTimeout(function () {
+    if (window.CRM_AVVIATO) return;
+    var parti = [
+      ['crm_map.js', !!window.CrmMap], ['crm_insights.js', !!window.CrmInsights],
+      ['crm_client_form.js', !!window.CrmClientForm], ['crm.js', !!window.CRM],
+      ['libreria Supabase', !!window.supabase], ['Leaflet', !!window.L]
+    ];
+    document.getElementById('root').innerHTML =
+      '<div id="login"><div style="max-width:420px;width:100%">' +
+      '<div class="brand" style="text-align:center">Wine Alchemist</div>' +
+      '<div class="inset" style="margin-top:16px;padding:14px 16px">' +
+      '<div class="ttl">Avvio non riuscito</div>' +
+      '<div class="sub" style="margin:8px 0">File caricati:</div>' +
+      parti.map(function (p) {
+        return '<div class="sub">' + (p[1] ? '✓ ' : '✕ ') + p[0] + '</div>';
+      }).join('') +
+      (errori.length ? '<div class="sub" style="margin-top:10px;color:var(--red)">' +
+        errori.slice(0, 4).map(function (x) { return x.replace(/</g, '&lt;'); }).join('<br>') + '</div>'
+        : '<div class="sub" style="margin-top:10px">Nessun errore JavaScript intercettato: probabile blocco di rete.</div>') +
+      '</div>' +
+      '<button class="btn" style="width:100%;margin-top:14px" onclick="location.reload(true)">Riprova</button>' +
+      '</div></div>';
+  }, 9000);
+})();
 </script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
-<script src="crm_map.js"></script>
-<script src="crm_insights.js"></script>
-<script src="crm_client_form.js"></script>
-<script src="crm.js"></script>
 </body>
 </html>

@@ -7,9 +7,18 @@ const CFG = Object.freeze(Object.assign({
   schema: 'crm', nome: 'Wine Alchemist', zona: 'Milano', cartone: 6, mappaCentro: [45.4642, 9.19]
 }, window.WA_CONFIG || {}));
 
-const sb = window.supabase.createClient(CFG.supabaseUrl, CFG.supabaseKey, {
-  db: { schema: CFG.schema }, auth: { persistSession: true, autoRefreshToken: true }
+const CDN_SUPABASE = 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js';
+let sb;   // assegnato da start(), dopo il caricamento della libreria
+
+const loadScript = src => new Promise((ok, ko) => {
+  const t = document.createElement('script');
+  t.src = src; t.async = false;
+  t.onload = ok;
+  t.onerror = () => ko(new Error('Non riesco a caricare ' + src));
+  document.head.appendChild(t);
 });
+const timeout = (p, ms, msg) => Promise.race([p,
+  new Promise((_, ko) => setTimeout(() => ko(new Error(msg)), ms))]);
 
 const S = { me: null, agents: {}, clients: [], view: null, busy: false, filtro: { q: '', set: 'tutti' } };
 
@@ -63,7 +72,9 @@ async function go(fn) { try { return await fn(); } catch (e) { console.error(e);
 
 /* ---------- accesso ---------- */
 async function boot() {
-  const { data: { session } } = await sb.auth.getSession();
+  const ses = await sb.auth.getSession();
+  if (ses.error) throw ses.error;
+  const session = ses.data.session;
   sb.auth.onAuthStateChange((_e, s) => { if (!s) { S.me = null; renderLogin(); } });
   if (!session) return renderLogin();
   const { data, error } = await sb.from('agents').select('*').eq('id', session.user.id).maybeSingle();
@@ -79,6 +90,7 @@ async function boot() {
 }
 
 function renderLogin(msg) {
+  window.CRM_AVVIATO = true;
   document.title = CFG.nome + ' CRM';
   $('#root').innerHTML = `<div id="login"><form id="lf" novalidate>
     <div class="brand">${esc(CFG.nome)}</div>
@@ -114,6 +126,7 @@ const NAV = [
   ['catalogo', 'Catalogo', '#/catalogo'], ['mappa', 'Mappa', '#/mappa'], ['analisi', 'Analisi', '#/analisi']
 ];
 function renderShell() {
+  window.CRM_AVVIATO = true;
   $('#root').innerHTML = `<div id="app">
     <aside id="side">
       <div class="brand">${esc(CFG.nome)}</div>
@@ -1026,8 +1039,41 @@ addRoute('analisi', async () => {
 });
 
 /* ---------- avvio ---------- */
-document.addEventListener('DOMContentLoaded', () => go(boot));
-if (document.readyState !== 'loading') go(boot);
+function fatal(e, dettaglio) {
+  window.CRM_AVVIATO = true;
+  document.getElementById('root').innerHTML = `<div id="login"><div style="max-width:380px">
+    <div class="brand" style="text-align:center">${esc(CFG.nome)}</div>
+    <div class="inset" style="margin-top:16px;padding:16px">
+      <div class="ttl" style="margin-bottom:6px">L'app non è riuscita ad avviarsi</div>
+      <div class="sub">${esc(e?.message || String(e))}</div>
+      ${dettaglio ? `<div class="sub" style="margin-top:8px">${esc(dettaglio)}</div>` : ''}
+    </div>
+    <button class="btn" style="width:100%;margin-top:14px" onclick="location.reload()">Riprova</button>
+  </div></div>`;
+  console.error('[WA CRM]', e);
+}
+
+async function start() {
+  try {
+    if (!window.supabase) {
+      await timeout(loadScript(CFG.demo ? 'crm_demo.js' : CDN_SUPABASE), 20000,
+        'Libreria non caricata: connessione assente o bloccata');
+    }
+    if (!window.supabase || !window.supabase.createClient) throw new Error('Libreria Supabase non disponibile');
+    if (!CFG.demo && (!CFG.supabaseUrl || /TUO-PROGETTO|TUA-ANON/.test(CFG.supabaseUrl + CFG.supabaseKey))) {
+      throw new Error('URL o chiave Supabase non configurati in index.html');
+    }
+    sb = window.supabase.createClient(CFG.supabaseUrl, CFG.supabaseKey, {
+      db: { schema: CFG.schema }, auth: { persistSession: true, autoRefreshToken: true }
+    });
+    await timeout(boot(), 25000, 'Il server non risponde: controlla la connessione');
+  } catch (e) {
+    fatal(e, CFG.demo ? 'Modalità demo: serve il file crm_demo.js accanto a index.html.'
+                      : 'Progetto: ' + (CFG.supabaseUrl || '—'));
+  }
+}
+if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start);
+else start();
 
 return { sb, CFG, S, go, toast, paint, loading, svg, esc, eur, dmy, gg, ini, lbl, pill, kpi, rowLink, kv,
          modal, addRoute, route, ensureClients, isAdmin, mine, canEdit, err };
