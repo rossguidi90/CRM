@@ -231,7 +231,9 @@ input.q:focus{outline:2px solid var(--accent);outline-offset:0}
 .btn:active,.chip:active,.step button:active,.quick>*:active{transform:scale(.96)}
 a .row:active,button.row:active{background:var(--fill)}
 @media (hover:hover){a .row:hover,button.row:hover,.quick>*:hover{background:var(--fill)}.btn.line:hover{background:var(--fill)}}
-#side nav a{transition:background-color .2s,color .2s,border-color .2s}
+#side nav a{transition:background-color .2s,color .2s;border-left:0!important;border-radius:12px;padding:0 12px}
+#side nav a.on{background:rgba(255,255,255,.1)}
+#side .me .av{border-radius:50%}
 .inset,.kpi,.card{box-shadow:0 1px 2px rgba(20,20,15,.04),0 4px 14px rgba(20,20,15,.035)}
 @media (prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important}}
 .inset{overflow:clip}
