@@ -1054,7 +1054,7 @@ addRoute('ordine', async (id, extra) => {
           ${kv('Trasporto', o.porto_franco ? 'Porto franco' : `Sotto i ${eur(400)}: trasporto a carico del cliente`)}
           <div class="row"><label>Totale</label><span class="v mono" style="font-size:19px;font-weight:700;color:var(--fg)">${eur(o.totale)}</span></div>
         </div></div>
-        ${azioni.length ? azioni.map(([st, l, c]) => `<button class="${c}" style="width:100%;margin-bottom:8px" data-go="${st}">${l}</button>`).join('') : ''}
+        ${azioni.map(([st, l, c], i) => `<button class="${c}${i ? '' : ' only-desktop'}" style="width:100%;margin-bottom:8px" data-go="${st}">${l}</button>`).join('')}
       </aside>
     </div>
     ${azioni.length ? `<div class="sheet hide-desktop">
@@ -1082,8 +1082,8 @@ addRoute('ordine', async (id, extra) => {
     };
     const cq = $('#cq');
     if (cq) {
-      if (f.q) { cq.focus(); cq.setSelectionRange(f.q.length, f.q.length); }
-      cq.addEventListener('input', e => { f.q = e.target.value; render(); });
+      if (f.focus) { f.focus = false; cq.focus({ preventScroll: true }); cq.setSelectionRange(f.q.length, f.q.length); }
+      cq.addEventListener('input', e => { f.q = e.target.value; f.focus = true; render(); });
       $('#tipi').addEventListener('click', e => {
         const b = e.target.closest('[data-tipo]'); if (!b) return;
         f.tipo = f.tipo === b.dataset.tipo ? '' : b.dataset.tipo; render();

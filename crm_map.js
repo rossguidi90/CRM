@@ -16,7 +16,6 @@ const CrmMap = (() => {
 
   document.head.insertAdjacentHTML('beforeend', `<style>
     .leaflet-tile-pane{filter:grayscale(1) contrast(.92) brightness(1.04)}
-    @media (prefers-color-scheme:dark){.leaflet-tile-pane{filter:grayscale(1) invert(1) contrast(.85) brightness(.85)}}
     .crm-pin{display:block;width:22px;height:22px;border-radius:50%;background:var(--c);
       border:3px solid var(--r);box-shadow:0 1px 5px rgb(0 0 0/.35)}
     .leaflet-popup-content-wrapper{border-radius:14px;font:14px/1.35 -apple-system,system-ui,sans-serif}
