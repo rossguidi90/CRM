@@ -120,7 +120,7 @@ h3{font-size:12px;font-weight:700;color:var(--fg2);text-transform:uppercase;lett
 .grid2{display:grid;gap:14px}
 @media (min-width:1024px){.grid2{grid-template-columns:repeat(2,minmax(0,1fr))}}
 .card{background:var(--card);border:1px solid var(--sep);border-radius:var(--r);padding:16px}
-.bar{display:flex;align-items:center;gap:10px;margin-bottom:14px}
+.bar{display:flex;align-items:center;gap:10px;margin-bottom:14px;flex-wrap:wrap}
 .bar h1{flex:1;min-width:0}
 .step{display:flex;align-items:center;background:var(--fill);border-radius:4px}
 .step button{width:38px;height:44px;border:0;background:none;color:var(--accent);font-size:20px;line-height:1}
@@ -187,7 +187,7 @@ window.WA_CONFIG = {
 <script src="crm_map.js?v=5"></script>
 <script src="crm_insights.js?v=5"></script>
 <script src="crm_client_form.js?v=5"></script>
-<script src="crm.js?v=5"></script>
+<script src="crm.js?v=6"></script>
 <script>
 // Diagnostica: se dopo 9 secondi l'app non è partita, dice cosa manca invece di girare a vuoto.
 (function () {

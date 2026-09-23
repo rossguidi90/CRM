@@ -913,7 +913,8 @@ addRoute('ordine', async (id, extra) => {
         <div class="bar"><a href="#/ordini" class="btn line sm">Ordini</a><span style="flex:1"></span>
           <button class="btn line sm" id="dup">Duplica</button>
           ${o.stato === 'bozza' && (isAdmin() || o.agent_id === S.me.id) ? '<button class="btn line sm" id="delOrd" style="color:var(--red)">Elimina</button>' : ''}
-          <button class="btn line sm" id="share">Condividi</button>${pill(o.stato)}</div>
+          <button class="btn line sm" id="mailOrd">✉️ Email</button>
+          <button class="btn line sm" id="waOrd">WhatsApp</button>${pill(o.stato)}</div>
         <h1 class="mono" style="font-size:22px">${esc(o.numero)}</h1>
         <div class="inset" style="margin-top:12px">
           <a href="#/cliente/${cli.id}"><div class="row">
@@ -991,7 +992,8 @@ addRoute('ordine', async (id, extra) => {
       const cur = items.get(w.id)?.qty || 0;
       go(() => setQty(w, cur + (inc ? passo(w) : -passo(w))));
     };
-    $('#share').addEventListener('click', () => condividi(o, [...items.values()], cli));
+    $('#mailOrd').addEventListener('click', () => mailOrdine(o, [...items.values()], cli));
+    $('#waOrd').addEventListener('click', () => waOrdine(o, [...items.values()], cli));
     $('#dup').addEventListener('click', () => go(async () => {
       const ins = await sb.from('orders')
         .insert({ client_id: o.client_id, agent_id: S.me.id, pagamento: o.pagamento }).select().single();
@@ -1042,11 +1044,17 @@ function testoOrdine(o, items, cli) {
     `Pagamento: ${lbl(o.pagamento)}`
   ].filter(Boolean).join('\n');
 }
-async function condividi(o, items, cli) {
+const ORD_EMAIL_TO = ['ordini@winealchemist.it', 'info@winealchemist.it'];
+const ORD_WHATSAPP = '393914175784'; // Fabio
+function mailOrdine(o, items, cli) {
   const text = testoOrdine(o, items, cli);
-  if (navigator.share) { try { return await navigator.share({ title: o.numero, text }); } catch (e) { if (e.name === 'AbortError') return; } }
-  try { await navigator.clipboard.writeText(text); toast('Ordine copiato negli appunti'); }
-  catch (e) { window.open('https://wa.me/?text=' + encodeURIComponent(text), '_blank'); }
+  const subject = `Ordine ${o.numero} - ${cli.insegna || cli.ragione_sociale || ''}`;
+  const url = `mailto:${ORD_EMAIL_TO.join(',')}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(text)}`;
+  window.location.href = url;
+}
+function waOrdine(o, items, cli) {
+  const text = testoOrdine(o, items, cli);
+  window.open(`https://wa.me/${ORD_WHATSAPP}?text=${encodeURIComponent(text)}`, '_blank');
 }
 
 /* ---------- Analisi ---------- */
