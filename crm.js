@@ -237,7 +237,7 @@ addRoute('home', async () => {
   const [trend6, recall, ordini, { data: prom }] = await Promise.all([
     CrmInsights.trend(sb, da6, oggi, { grain: 'month' }).catch(() => []),
     CrmInsights.toRecall(sb),
-    sb.from('orders').select('id, numero, stato, totale, created_at, client_id, agent_id').order('created_at', { ascending: false }).limit(6),
+    sb.from('v_ordini').select('*').order('created_at', { ascending: false }).limit(6),
     (() => { let q = sb.from('reminders').select('*').eq('fatto', false)
       .lte('due_at', new Date(Date.now() + 7 * 864e5).toISOString()).order('due_at').limit(20);
       return q; })()
@@ -274,7 +274,7 @@ addRoute('home', async () => {
     </div></div>
     <div class="group"><h3>Ultimi ordini</h3><div class="inset">
       ${(ordini.data || []).map(o => rowLink(`#/ordine/${o.id}`, o.numero,
-        `${nome(o.client_id)} · ${dmy(o.created_at)}${S.agents[o.agent_id] && innerWidth < 720 ? ' · ' + S.agents[o.agent_id].nome : ''}`, `${S.agents[o.agent_id] ? `<span class="pill hide-m"><i class="dot-ag" style="--ac:${S.agents[o.agent_id].colore}"></i>${esc(S.agents[o.agent_id].nome)}</span>` : ''}<span class="mono">${eur(o.totale)}</span>${pill(o.stato)}`, false)).join('')
+        `${nome(o.client_id)} · ${dmy(o.created_at)}${S.agents[o.agent_id] && innerWidth < 720 ? ' · ' + S.agents[o.agent_id].nome : ''}`, `${S.agents[o.agent_id] ? `<span class="pill hide-m"><i class="dot-ag" style="--ac:${S.agents[o.agent_id].colore}"></i>${esc(S.agents[o.agent_id].nome)}</span>` : ''}${o.dettaglio ? `<span class="mono">${eur(o.totale)}</span>` : '<span class="pill" title="Dettaglio riservato all\'agente">🔒 riservato</span>'}${pill(o.stato)}`, false)).join('')
         || '<div class="empty">Nessun ordine.</div>'}
     </div></div>`);
   bindProm($('#promList'), prom);
@@ -298,7 +298,7 @@ async function ensureClients(force) {
 
 addRoute('clienti', async () => {
   await ensureClients(true);
-  const { data: ords } = await sb.from('orders').select('client_id, created_at').neq('stato', 'annullato');
+  const { data: ords } = await sb.from('v_ordini').select('client_id, created_at').neq('stato', 'annullato');
   const last = {};
   (ords || []).forEach(o => { if (!last[o.client_id] || o.created_at > last[o.client_id]) last[o.client_id] = o.created_at; });
   const F = S.filtro;
@@ -360,7 +360,9 @@ addRoute('cliente', async (id) => {
   const [{ data: c, error }, { data: ct }, storico, sugg, { data: prom }, { data: diario }, { data: storicoAltrove }] = await Promise.all([
     sb.from('clients').select('*').eq('id', id).single(),
     sb.from('client_contacts').select('*').eq('client_id', id).order('principale', { ascending: false }),
-    CrmInsights.orderHistory(sb, id),
+    Promise.all([sb.from('v_ordini').select('*').eq('client_id', id).order('created_at', { ascending: false }),
+      sb.from('v_referenze').select('order_id, wine_label, qty').eq('client_id', id)])
+      .then(([a, b]) => (a.data || []).map(o => ({ ...o, refs: (b.data || []).filter(r => r.order_id === o.id) }))),
     CrmInsights.suggest(sb, id, 5).catch(() => []),
     sb.from('reminders').select('*').eq('client_id', id).eq('fatto', false).order('due_at'),
     sb.from('activities').select('*').eq('client_id', id).order('data', { ascending: false }).order('created_at', { ascending: false }).limit(30),
@@ -465,12 +467,13 @@ addRoute('cliente', async (id) => {
         || '<div class="empty">Ancora pochi dati per suggerire referenze.</div>'}
     </div></div>
     <div class="group"><h3 class="h3act"><span>Storico ordini</span>
-      ${canOrder(c) && (storico || []).some(o => o.stato !== 'annullato')
+      ${canOrder(c) && (storico || []).some(o => o.stato !== 'annullato' && o.dettaglio)
         ? `<button class="btn line sm" id="rifai">${svg('rifai', 14)} Rifai ultimo ordine</button>` : ''}</h3><div class="inset">
       ${(storico || []).map(o => `<a href="#/ordine/${o.id}"><div class="row">
         <span style="flex:1;min-width:0"><span class="ttl mono">${esc(o.numero)}</span><br>
-        <span class="sub">${dmy(o.inviato_at || o.created_at)} · ${bt(o)} bt · ${(o.order_items || []).length} referenze</span></span>
-        <span class="mono">${eur(o.totale)}</span>${pill(o.stato)}${svg('chev', 14, 'chev')}</div></a>`).join('')
+        <span class="sub">${dmy(o.inviato_at || o.created_at)}${S.agents[o.agent_id] ? ' · ' + esc(S.agents[o.agent_id].nome) : ''} · ${o.dettaglio ? o.refs.reduce((a, r) => a + (r.qty || 0), 0) + ' bt · ' : ''}${o.refs.length} referenze</span>
+        <span class="sub refs">${esc(o.refs.slice(0, 4).map(r => r.wine_label.replace(/ \[FUORI ZONA\]$/, '')).join(' · '))}${o.refs.length > 4 ? ` · +${o.refs.length - 4}` : ''}</span></span>
+        ${o.dettaglio ? `<span class="mono">${eur(o.totale)}</span>` : '<span class="pill" title="Dettaglio riservato all\'agente">🔒 riservato</span>'}${pill(o.stato)}${svg('chev', 14, 'chev')}</div></a>`).join('')
         || '<div class="empty">Nessun ordine registrato.</div>'}
     </div></div>`);
   $('#ord')?.addEventListener('click', () => (location.hash = '#/ordine/nuovo/' + c.id));
@@ -495,7 +498,7 @@ addRoute('cliente', async (id) => {
   $('#promNew')?.addEventListener('click', () => nuovoPromemoria(c, 'promemoria'));
   bindProm($('#promList'), prom);
   $('#rifai')?.addEventListener('click', () => go(async () => {
-    const o = (storico || []).find(x => x.stato !== 'annullato');
+    const o = (storico || []).find(x => x.stato !== 'annullato' && x.dettaglio);
     if (!o || !confirm(`Creare una nuova bozza uguale all'ordine ${o.numero}?`)) return;
     location.hash = '#/ordine/' + await duplicaOrdine(o.id);
     toast('Nuova bozza creata da ' + o.numero);
@@ -1118,7 +1121,7 @@ function pickCliente(cb) {
 
 addRoute('ordini', async () => {
   await ensureClients();
-  const { data, error } = await sb.from('orders').select('*').order('created_at', { ascending: false }).limit(200);
+  const { data, error } = await sb.from('v_ordini').select('*').order('created_at', { ascending: false }).limit(300);
   if (error) throw error;
   const f = { stato: '', q: '' };
   const draw = () => {
@@ -1128,7 +1131,7 @@ addRoute('ordini', async () => {
       <span style="flex:1;min-width:0"><span class="ttl mono">${esc(o.numero)}</span><br>
         <span class="sub">${esc(nomeCli(o.client_id))} · ${dmy(o.inviato_at || o.created_at)}${S.agents[o.agent_id] ? ' · ' + esc(S.agents[o.agent_id].nome) : ''}
         ${o.scade_at ? ' · scade ' + dmy(o.scade_at) : ''}</span></span>
-      <span class="mono">${eur(o.totale)}</span>${pill(o.stato)}${svg('chev', 14, 'chev')}</div></a>`).join('')
+      ${o.dettaglio ? `<span class="mono">${eur(o.totale)}</span>` : `<span class="sub">${o.n_referenze} ref.</span><span class="pill" title="Dettaglio riservato all'agente">🔒 riservato</span>`}${pill(o.stato)}${svg('chev', 14, 'chev')}</div></a>`).join('')
       || '<div class="empty">Nessun ordine.</div>';
     $('#cnt').textContent = `${list.length} ${list.length === 1 ? 'ordine' : 'ordini'} · ${eur(list.reduce((a, o) => a + num(o.totale), 0))}`;
   };
@@ -1162,6 +1165,8 @@ addRoute('ordine', async (id, extra) => {
     location.replace('#/ordine/' + data.id);
     return;
   }
+  const { data: vo } = await sb.from('v_ordini').select('*').eq('id', id).maybeSingle();
+  if (vo && !vo.dettaglio) return ordineRiservato(vo);
   const [{ data: o, error }, { data: rows }, { data: ws }, { data: stock }] = await Promise.all([
     sb.from('orders').select('*').eq('id', id).single(),
     sb.from('order_items').select('*').eq('order_id', id),
@@ -1331,8 +1336,8 @@ addRoute('ordine', async (id, extra) => {
 `;
     const azioni = [];
     if (editabile) azioni.push(['inviato', 'Invia ordine', 'btn']);
-    if (isAdmin() && o.stato === 'inviato') azioni.push(['confermato', 'Conferma', 'btn'], ['annullato', 'Annulla', 'btn ghost']);
-    if (isAdmin() && o.stato === 'confermato') azioni.push(['evaso', 'Segna evaso', 'btn']);
+    if ((isAdmin() || isViewer()) && o.stato === 'inviato') azioni.push(['confermato', 'Conferma', 'btn'], ['annullato', 'Annulla', 'btn ghost']);
+    if ((isAdmin() || isViewer()) && o.stato === 'confermato') azioni.push(['evaso', 'Segna evaso', 'btn']);
 
     const y0 = f.primo ? 0 : window.scrollY, cy0 = $('.ord-cart')?.scrollTop || 0;
     f.primo = false;
@@ -1552,6 +1557,23 @@ function righeDati(d) {
     d.codice_sdi ? `SDI: ${d.codice_sdi}` : '',
     d.pec ? `PEC: ${d.pec}` : ''
   ];
+}
+async function ordineRiservato(o) {
+  const { data: refs } = await sb.from('v_referenze').select('wine_id, wine_label').eq('order_id', o.id);
+  const cli = S.clients.find(c => c.id === o.client_id) || {}, ag = S.agents[o.agent_id];
+  paint(`<div class="bar"><a href="#/ordini" class="btn line sm">‹<span class="hide-m">&nbsp;Ordini</span></a></div>
+    <h1 class="mono" style="font-size:22px;display:flex;align-items:center;gap:10px;flex-wrap:wrap">${esc(o.numero)} ${pill(o.stato)}</h1>
+    <div class="inset" style="margin-top:12px">
+      <a href="#/cliente/${cli.id}"><div class="row"><span class="av">${esc(ini(cli.insegna || cli.ragione_sociale || '?'))}</span>
+        <span style="flex:1;min-width:0"><span class="ttl">${esc(cli.insegna || cli.ragione_sociale || '—')}</span><br>
+        <span class="sub">${esc([cli.indirizzo, cli.zona || cli.citta].filter(Boolean).join(' · '))}</span></span>${svg('chev', 14, 'chev')}</div></a>
+      ${kv('Agente', ag?.nome || '—')}${kv('Data', dmy(o.inviato_at || o.created_at))}
+    </div>
+    <div class="group"><h3>Referenze ordinate · ${(refs || []).length}</h3><div class="inset">
+      ${(refs || []).map(r => `<div class="row"><span style="flex:1;min-width:0"><span class="ttl" style="font-size:15px">${esc(r.wine_label)}</span></span></div>`).join('')
+        || '<div class="empty">Nessuna referenza.</div>'}
+    </div></div>
+    <div class="empty" style="padding:14px 4px">🔒 Quantità e importi sono visibili solo a ${esc(ag?.nome || "all'agente")}. Le referenze servono per capire cosa proporre ai locali vicini.</div>`);
 }
 function testoOrdine(o, items, cli) {
   return [
