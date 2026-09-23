@@ -55,7 +55,8 @@ const ICON = {
   cerca: 'M11 4a7 7 0 1 0 0 14 7 7 0 0 0 0-14M21 21l-5-5',
   chev: 'M9 6l6 6-6 6', piu: 'M12 5v14M5 12h14',
   tel: 'M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2',
-  chat: 'M4 5h16v11H9l-5 4z', cal: 'M4 6h16v14H4zM4 10h16M8 3v5M16 3v5', doc: 'M7 3h8l4 4v14H7zM15 3v4h4M10 13h6M10 17h4',
+  chat: 'M4 5h16v11H9l-5 4z', tema: 'M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z',
+  cart: 'M3 4h2.5l2.3 11.2h10.4L21 8H6.6M9.5 20.2h.01M17.5 20.2h.01', cal: 'M4 6h16v14H4zM4 10h16M8 3v5M16 3v5', doc: 'M7 3h8l4 4v14H7zM15 3v4h4M10 13h6M10 17h4',
   rifai: 'M4 12a8 8 0 0 1 14-5.3L20 9M20 4v5h-5M20 12a8 8 0 0 1-14 5.3L4 15M4 20v-5h5', mail: 'M3 6h18v12H3zM3 7l9 6 9-6',
   pin: 'M12 21s-7-6.5-7-12a7 7 0 0 1 14 0c0 5.5-7 12-7 12zM12 11.5a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5',
   star: 'M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8z'
@@ -104,7 +105,7 @@ async function boot() {
 }
 
 function renderLogin(msg) {
-  window.CRM_AVVIATO = true;
+  window.CRM_AVVIATO = true; hideSplash();
   document.title = CFG.nome + ' CRM';
   $('#root').innerHTML = `<div id="login"><form id="lf" novalidate>
     <div class="brand">${esc(CFG.nome)}</div>
@@ -146,12 +147,13 @@ const NAV = [
   ['catalogo', 'Catalogo', '#/catalogo'], ['mappa', 'Mappa', '#/mappa'], ['analisi', 'Analisi', '#/analisi']
 ];
 function renderShell() {
-  window.CRM_AVVIATO = true;
+  window.CRM_AVVIATO = true; hideSplash();
   $('#root').innerHTML = `<div id="app">
     <aside id="side">
       <div class="brand">${esc(CFG.nome)}</div>
       <nav>${NAV.map(([k, l, h]) =>
         `<a href="${h}" data-nav="${k}">${svg(k, 18)}<span>${l}</span><span class="n" data-n="${k}"></span></a>`).join('')}</nav>
+      ${temaBtn()}
       <div class="me">
         <span class="av round">${esc(ini(S.me.nome))}</span>
         <span><span class="ttl" style="font-size:13px">${esc(S.me.nome)}</span><br>
@@ -167,6 +169,24 @@ function renderShell() {
   $('#out').addEventListener('click', () => go(async () => { await sb.auth.signOut(); location.hash = ''; renderLogin(); }));
 }
 const isAdmin = () => S.me?.ruolo === 'admin';
+function hideSplash() {
+  const sp = document.getElementById('splash'); if (!sp || sp.classList.contains('out')) return;
+  setTimeout(() => { sp.classList.add('out'); setTimeout(() => sp.remove(), 500); }, 350);
+}
+const TEMI = [['auto', 'Automatico'], ['light', 'Chiaro'], ['dark', 'Scuro']];
+const temaCorrente = () => { try { return localStorage.getItem('wa-theme') || 'auto'; } catch (e) { return 'auto'; } };
+function applicaTema(t) {
+  if (t === 'auto') delete document.documentElement.dataset.theme; else document.documentElement.dataset.theme = t;
+  try { t === 'auto' ? localStorage.removeItem('wa-theme') : localStorage.setItem('wa-theme', t); } catch (e) {}
+  document.querySelectorAll('[data-tema-lbl]').forEach(el => (el.textContent = TEMI.find(x => x[0] === t)[1]));
+}
+document.addEventListener('click', e => {
+  if (!e.target.closest('.theme-btn')) return;
+  const i = TEMI.findIndex(x => x[0] === temaCorrente());
+  applicaTema(TEMI[(i + 1) % TEMI.length][0]);
+});
+const temaBtn = (cls = '') => `<button class="btn line sm theme-btn ${cls}" type="button" aria-label="Cambia tema">${svg('tema', 15)}
+  <span data-tema-lbl>${TEMI.find(x => x[0] === temaCorrente())[1]}</span></button>`;
 const isViewer = () => S.me?.ruolo === 'viewer';
 const mine = c => c.agent_id === S.me.id;
 const canEdit = c => isAdmin() || mine(c);
@@ -177,9 +197,24 @@ function setNav(k) {
 }
 const paint = html => {
   const m = $('#main'); m.innerHTML = html; window.scrollTo(0, 0);
-  if (S.anim) { S.anim = false; m.classList.remove('enter'); void m.offsetWidth; m.classList.add('enter'); }
+  if (S.anim) { S.anim = false; m.classList.remove('enter'); void m.offsetWidth; m.classList.add('enter'); countUp(m); }
 };
-const loading = () => paint('<div class="spin"></div>');
+function countUp(root) {
+  if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  root.querySelectorAll('.kpi .v').forEach(el => {
+    const txt = el.textContent.trim(), m = txt.match(/^([\d.]+(?:,\d+)?)(\s*€)?$/);
+    if (!m) return;
+    const val = parseFloat(m[1].replace(/\./g, '').replace(',', '.')); if (!val) return;
+    const money = !!m[2], dur = 900, t0 = performance.now();
+    const fmt = v => money ? eur(v) : Math.round(v).toLocaleString('it-IT');
+    const step = t => { const k = Math.min(1, (t - t0) / dur), e = 1 - Math.pow(1 - k, 3);
+      el.textContent = fmt(val * e); if (k < 1) requestAnimationFrame(step); else el.textContent = txt; };
+    requestAnimationFrame(step);
+  });
+}
+const loading = () => paint(`<div class="sk sk-t"></div>
+  ${S.view === 'home' || S.view === 'analisi' ? '<div class="sk-k"><div class="sk"></div><div class="sk"></div><div class="sk"></div><div class="sk"></div></div>' : '<div class="sk" style="height:42px;margin-bottom:14px"></div>'}
+  <div class="sk-l">${'<div class="sk-r"><span class="sk a"></span><span class="b"><i class="sk" style="width:55%"></i><i class="sk" style="width:35%"></i></span></div>'.repeat(6)}</div>`);
 
 /* ---------- router ---------- */
 const ROUTES = [];
@@ -198,8 +233,9 @@ const addRoute = (seg, run, nav) => ROUTES.push({ seg, run, nav });
 /* ---------- Home ---------- */
 addRoute('home', async () => {
   const oggi = new Date(), da = new Date(oggi.getFullYear(), oggi.getMonth(), 1);
-  const [trend, recall, ordini, { data: prom }] = await Promise.all([
-    CrmInsights.trend(sb, da, oggi, { grain: 'month' }),
+  const da6 = new Date(oggi.getFullYear(), oggi.getMonth() - 5, 1);
+  const [trend6, recall, ordini, { data: prom }] = await Promise.all([
+    CrmInsights.trend(sb, da6, oggi, { grain: 'month' }).catch(() => []),
     CrmInsights.toRecall(sb),
     sb.from('orders').select('id, numero, stato, totale, created_at, client_id').order('created_at', { ascending: false }).limit(6),
     (() => { let q = sb.from('reminders').select('*').eq('fatto', false)
@@ -207,16 +243,22 @@ addRoute('home', async () => {
       return isAdmin() || isViewer() ? q : q.eq('agent_id', S.me.id); })()
   ]);
   if (ordini.error) throw ordini.error;
-  const t = (trend || [])[0] || {};
+  const mesi = [...Array(6)].map((_, i) => { const d = new Date(oggi.getFullYear(), oggi.getMonth() - 5 + i, 1);
+    const r = (trend6 || []).find(x => { const p = new Date(x.periodo); return p.getFullYear() === d.getFullYear() && p.getMonth() === d.getMonth(); });
+    return { d, v: num(r?.fatturato), r }; });
+  const t = mesi[5].r || {}, maxM = Math.max(1, ...mesi.map(m => m.v));
+  const spark = `<div class="spark" title="Fatturato ultimi 6 mesi">${mesi.map((m, i) =>
+    `<i class="${i === 5 ? 'cur' : ''}" style="height:${Math.max(8, Math.round(m.v / maxM * 100))}%;animation-delay:${i * 50}ms"
+      title="${m.d.toLocaleDateString('it-IT', { month: 'short' })}: ${eur(m.v)}"></i>`).join('')}</div>`;
   const attesa = (ordini.data || []).filter(o => o.stato === 'inviato').length;
   await ensureClients();
   const nome = c => { const x = S.clients.find(k => k.id === c); return x ? (x.insegna || x.ragione_sociale) : '—'; };
   paint(`
     <div class="bar"><div><div class="sub">${esc(new Date().toLocaleDateString('it-IT', { weekday: 'long', day: 'numeric', month: 'long' }))}</div>
       <h1>Ciao, ${esc(S.me.nome.split(' ')[0])}</h1></div><span style="flex:1"></span>
-      <button class="btn line sm hide-desktop" id="out2">Esci</button></div>
+      <span class="hide-desktop" style="display:flex;gap:8px">${temaBtn()}<button class="btn line sm" id="out2">Esci</button></span></div>
     <div class="kpis">
-      ${kpi('Fatturato mese', eur(t.fatturato || 0), `${t.ordini || 0} ordini confermati`)}
+      ${kpi('Fatturato mese', eur(t.fatturato || 0), `${t.ordini || 0} ordini confermati`, '', spark)}
       ${kpi('In attesa', String(attesa), 'ordini inviati da confermare', attesa ? 'orange' : '')}
       ${kpi('Clienti', String(S.clients.filter(c => isAdmin() || isViewer() || mine(c)).length), isAdmin() || isViewer() ? 'in rete' : 'assegnati a te')}
       ${kpi('Da richiamare', String((recall || []).length), 'oltre il ritmo abituale', recall?.length ? 'orange' : '')}
@@ -227,7 +269,7 @@ addRoute('home', async () => {
     <div class="group"><h3>Da richiamare</h3><div class="inset">
       ${(recall || []).slice(0, 6).map(r => rowLink(`#/cliente/${r.client_id}`, r.nome,
         `Ultimo ordine ${r.giorni} gg fa · ritmo ${Math.round(r.intervallo_medio || 0)} gg`,
-        S.agents[r.agent_id] ? `<span class="pill">${esc(S.agents[r.agent_id].nome)}</span>` : '')).join('')
+        S.agents[r.agent_id] ? `<span class="pill">${esc(S.agents[r.agent_id].nome)}</span>` : '', true, S.agents[r.agent_id]?.colore)).join('')
         || '<div class="empty">Nessun cliente in ritardo.</div>'}
     </div></div>
     <div class="group"><h3>Ultimi ordini</h3><div class="inset">
@@ -237,11 +279,11 @@ addRoute('home', async () => {
     </div></div>`);
   bindProm($('#promList'));
 });
-const kpi = (l, v, n, tone = '') =>
+const kpi = (l, v, n, tone = '', extra = '') =>
   `<div class="kpi"><span class="l">${esc(l)}</span><span class="v mono">${esc(v)}</span>
-   <span class="n" ${tone === 'orange' ? 'style="color:var(--orange)"' : ''}>${esc(n)}</span></div>`;
-const rowLink = (href, ttl, sub, right = '', av = true) => `<a href="${href}"><div class="row">
-  ${av ? `<span class="av">${esc(ini(ttl))}</span>` : ''}
+   <span class="n" ${tone === 'orange' ? 'style="color:var(--orange)"' : ''}>${esc(n)}</span>${extra}</div>`;
+const rowLink = (href, ttl, sub, right = '', av = true, col = '') => `<a href="${href}"><div class="row">
+  ${av ? `<span class="av${col ? ' ag' : ''}" ${col ? `style="--ac:${col}"` : ''}>${esc(ini(ttl))}</span>` : ''}
   <span style="flex:1;min-width:0"><span class="ttl${av ? '' : ' mono'}">${esc(ttl)}</span><br><span class="sub">${esc(sub)}</span></span>
   ${right}${svg('chev', 14, 'chev')}</div></a>`;
 
@@ -276,7 +318,8 @@ addRoute('clienti', async () => {
     else list.sort((a, b) => nm(a).localeCompare(nm(b), 'it'));
     $('#lista').innerHTML = list.map(c => rowLink(`#/cliente/${c.id}`, c.insegna || c.ragione_sociale,
       [lbl(c.tipologia), c.zona || c.citta, F.sort === 'ordine' ? (last[c.id] ? 'ultimo ordine ' + dmy(last[c.id]) : 'mai ordinato') : null].filter(Boolean).join(' · '),
-      `<span class="tags">${pill(c.stato)}<span class="pill">${esc(S.agents[c.agent_id]?.nome?.split(' ')[0] || '—')}</span></span>`)).join('')
+      `<span class="tags">${pill(c.stato)}<span class="pill"><i class="dot-ag" style="--ac:${S.agents[c.agent_id]?.colore || 'var(--fg3)'}"></i>${esc(S.agents[c.agent_id]?.nome?.split(' ')[0] || '—')}</span></span>`,
+      true, S.agents[c.agent_id]?.colore)).join('')
       || '<div class="empty">Nessun cliente con questi filtri.</div>';
     $('#cnt').textContent = list.length + ' clienti';
   };
@@ -345,14 +388,14 @@ addRoute('cliente', async (id) => {
       ${canOrder(c) ? '<button class="btn sm" id="ord">Nuovo ordine</button>' : ''}
     </div>
     <div class="row" style="padding:0 4px 12px;border:0;align-items:flex-start">
-      <span class="av" style="width:58px;height:58px;border-radius:15px;font-size:19px;background:var(--accent);color:#fff">
+      <span class="av big" style="--ac:${ag?.colore || 'var(--accent)'}">
         ${esc(ini(c.insegna || c.ragione_sociale))}</span>
       <span style="flex:1;min-width:0">
         <h1 style="font-size:24px">${esc(c.insegna || c.ragione_sociale)}</h1>
         <span class="sub">${esc([lbl(c.tipologia), c.indirizzo, c.zona || c.citta].filter(Boolean).join(' · '))}</span><br>
         <span style="display:inline-flex;gap:6px;margin-top:6px">${pill(c.stato)}
           ${c.priorita ? `<span class="pill">Priorità ${esc(c.priorita)}</span>` : ''}
-          <span class="pill">${esc(ag?.nome || '—')}</span></span>
+          <span class="pill"><i class="dot-ag" style="--ac:${ag?.colore || 'var(--fg3)'}"></i>${esc(ag?.nome || '—')}</span></span>
       </span>
     </div>
     <div class="inset quick">
@@ -1180,6 +1223,13 @@ addRoute('ordine', async (id, extra) => {
     const bt = [...items.values()].reduce((a, i) => a + i.qty, 0);
     const lordoTot = scelti.reduce((a, w) => { const it = items.get(w.id); return a + it.qty * num(it.prezzo_unitario ?? w.prezzo_listino); }, 0);
     const scontiTot = lordoTot - num(o.imponibile);
+    const riep = `          ${scontiTot > 0.004 ? kv('Totale listino', eur(lordoTot)) + kv('Sconti e omaggi', '− ' + eur(scontiTot)) : ''}
+          ${kv('Imponibile', eur(o.imponibile))}
+          ${o.sconto_pagamento ? kv('Sconto pagamento anticipato', '− ' + eur(o.sconto_pagamento)) : ''}
+          ${o.omaggio_bt ? kv('Sconto merce', `${o.omaggio_bt} bt omaggio · ${esc(items.get(o.omaggio_wine_id)?.wine_label || '')}`) : ''}
+          ${kv('Trasporto', o.porto_franco ? 'Porto franco' : `Sotto i ${eur(400)}: trasporto a carico del cliente`)}
+          <div class="row"><label>Totale</label><span class="v mono" style="font-size:19px;font-weight:700;color:var(--fg)">${eur(o.totale)}</span></div>
+`;
     const azioni = [];
     if (editabile) azioni.push(['inviato', 'Invia ordine', 'btn']);
     if (isAdmin() && o.stato === 'inviato') azioni.push(['confermato', 'Conferma', 'btn'], ['annullato', 'Annulla', 'btn ghost']);
@@ -1239,24 +1289,33 @@ addRoute('ordine', async (id, extra) => {
         <div class="group" style="margin-top:0"><h3>Carrello${bt ? ' · ' + bt + ' bottiglie' : ''}</h3><div class="inset">
           ${scelti.map(rigaCarrello).join('') || '<div class="cart-empty">Nessuna referenza selezionata.</div>'}
         </div></div>
-        <div class="group"><h3>Riepilogo</h3><div class="inset">
-          ${scontiTot > 0.004 ? kv('Totale listino', eur(lordoTot)) + kv('Sconti e omaggi', '− ' + eur(scontiTot)) : ''}
-          ${kv('Imponibile', eur(o.imponibile))}
-          ${o.sconto_pagamento ? kv('Sconto pagamento anticipato', '− ' + eur(o.sconto_pagamento)) : ''}
-          ${o.omaggio_bt ? kv('Sconto merce', `${o.omaggio_bt} bt omaggio · ${esc(items.get(o.omaggio_wine_id)?.wine_label || '')}`) : ''}
-          ${kv('Trasporto', o.porto_franco ? 'Porto franco' : `Sotto i ${eur(400)}: trasporto a carico del cliente`)}
-          <div class="row"><label>Totale</label><span class="v mono" style="font-size:19px;font-weight:700;color:var(--fg)">${eur(o.totale)}</span></div>
-        </div></div>
+        <div class="group"><h3>Riepilogo</h3><div class="inset">${riep}</div></div>
         ${azioni.map(([st, l, c], i) => `<button class="${c}${i ? '' : ' only-desktop'}" style="width:100%;margin-bottom:8px" data-go="${st}">${l}</button>`).join('')}
       </aside>
     </div>
     ${azioni.length ? `<div class="sheet hide-desktop">
-      <span style="flex:1"><span class="sub">${bt} bt · ${items.size} ${items.size === 1 ? 'referenza' : 'referenze'}</span><br>
-        <span class="mono" style="font-size:20px;font-weight:700">${eur(o.totale)}</span></span>
+      <button class="cartbtn" id="goCart" aria-label="Apri carrello">${svg('cart', 22)}${bt ? `<span class="badge${bt !== f.lastBt && f.lastBt != null ? ' bump' : ''}">${bt}</span>` : ''}</button>
+      <button class="tot" id="goCart2"><span class="sub">${bt} bt · ${items.size} ${items.size === 1 ? 'referenza' : 'referenze'}</span><br>
+        <span class="mono" style="font-size:20px;font-weight:700;color:var(--fg)">${eur(o.totale)}</span></button>
       <button class="${azioni[0][2]}" data-go="${azioni[0][0]}">${azioni[0][1]}</button>
     </div>` : ''}`);
 
     window.scrollTo(0, y0); const oc = $('.ord-cart'); if (oc) oc.scrollTop = cy0;
+    f.lastBt = bt;
+    const cartHtml = () => `<div class="bar"><h2>Carrello${bt ? ' · ' + bt + ' bt' : ''}</h2><span style="flex:1"></span>
+        <button class="btn line sm" data-x>Chiudi</button></div>
+      <div class="inset">${scelti.map(rigaCarrello).join('') || '<div class="cart-empty">Nessuna referenza selezionata.</div>'}</div>
+      <div class="group"><h3>Riepilogo</h3><div class="inset">${riep}</div></div>`;
+    if (f.cartM?.isConnected) f.cartM.firstElementChild.innerHTML = cartHtml();
+    const apriCarrello = () => {
+      const m = modal(cartHtml()); f.cartM = m;
+      m.addEventListener('click', e => { if (e.target.closest('[data-x]')) return m.remove(); $('#main').onclick?.(e); });
+      m.addEventListener('change', e => $('#main').onchange?.(e));
+      m.addEventListener('keydown', e => $('#main').onkeydown?.(e));
+      m.addEventListener('focusin', e => $('#main').onfocusin?.(e));
+    };
+    $('#goCart')?.addEventListener('click', apriCarrello);
+    $('#goCart2')?.addEventListener('click', apriCarrello);
     const zs = $('#zona');
     if (zs) zs.addEventListener('change', e => { f.zona = e.target.value; render(); });
     $('#tipoSel')?.addEventListener('change', e => { f.tipo = e.target.value; render(); });
@@ -1504,7 +1563,7 @@ addRoute('analisi', async () => {
 
 /* ---------- avvio ---------- */
 function fatal(e, dettaglio) {
-  window.CRM_AVVIATO = true;
+  window.CRM_AVVIATO = true; hideSplash();
   document.getElementById('root').innerHTML = `<div id="login"><div style="max-width:380px">
     <div class="brand" style="text-align:center">${esc(CFG.nome)}</div>
     <div class="inset" style="margin-top:16px;padding:16px">

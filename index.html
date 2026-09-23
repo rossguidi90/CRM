@@ -3,7 +3,12 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="theme-color" content="#F2F2F7">
+<meta name="theme-color" content="#FAFAF8" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#131211" media="(prefers-color-scheme: dark)">
+<link rel="icon" type="image/png" href="favicon.png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<script>try{var t=localStorage.getItem('wa-theme');if(t==='light'||t==='dark')document.documentElement.dataset.theme=t}catch(e){}</script>
 <title>Wine Alchemist CRM</title>
 <link rel="manifest" href="manifest.webmanifest">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -19,8 +24,23 @@
   --blue:#0058B0; --blue-t:#E3EFFC; --purple:#4B49B8; --purple-t:#ECEBFB;
   --red:#B3261E; --red-t:#FCE6E4; --gold:#8A6A1E; --gold-t:#F3EBDD; --grey-t:#ECECE7;
   --r:16px; --tab:84px;
+  --on-accent:#FFFFFF;
   --font:-apple-system,BlinkMacSystemFont,"SF Pro Text","Helvetica Neue",sans-serif;
 }
+@media (prefers-color-scheme:dark){:root:not([data-theme=light]){--bg:#131211; --card:#1C1A19; --card2:#242220; --side:#0A0908;
+  --fg:#F2EFE9; --fg2:#A9A49B; --fg3:#78736C; --sep:#2B2826; --border:#3A3632;
+  --accent:#F2EFE9; --on-accent:#161614; --accent-tint:#2E2B28; --fill:#262321;
+  --green:#6FCF8B; --green-t:#1B3223; --orange:#F2A65A; --orange-t:#3A2A17;
+  --blue:#80B6F4; --blue-t:#192A3E; --purple:#AFADF6; --purple-t:#272648;
+  --red:#F28B82; --red-t:#3D1F1C; --gold:#E2C27C; --gold-t:#382F1E; --grey-t:#2E2B28;
+  color-scheme:dark;}}
+:root[data-theme=dark]{--bg:#131211; --card:#1C1A19; --card2:#242220; --side:#0A0908;
+  --fg:#F2EFE9; --fg2:#A9A49B; --fg3:#78736C; --sep:#2B2826; --border:#3A3632;
+  --accent:#F2EFE9; --on-accent:#161614; --accent-tint:#2E2B28; --fill:#262321;
+  --green:#6FCF8B; --green-t:#1B3223; --orange:#F2A65A; --orange-t:#3A2A17;
+  --blue:#80B6F4; --blue-t:#192A3E; --purple:#AFADF6; --purple-t:#272648;
+  --red:#F28B82; --red-t:#3D1F1C; --gold:#E2C27C; --gold-t:#382F1E; --grey-t:#2E2B28;
+  color-scheme:dark;}
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 html,body{margin:0;padding:0;height:100%}
 body{background:var(--bg);color:var(--fg);font:16px/1.35 var(--font);-webkit-font-smoothing:antialiased;overscroll-behavior-y:none}
@@ -97,7 +117,7 @@ h3{font-size:12px;font-weight:700;color:var(--fg2);text-transform:uppercase;lett
 .pill.visitato,.pill.su_prenotazione{background:var(--purple-t);color:var(--purple)}
 .pill.perso,.pill.annullato,.pill.esaurito{background:var(--red-t);color:var(--red)}
 .pill.dormiente,.pill.in_arrivo{background:var(--gold-t);color:var(--gold)}
-.btn{border:0;border-radius:14px;min-height:46px;padding:0 18px;background:var(--accent);color:#fff;font-size:15px;font-weight:600;
+.btn{border:0;border-radius:14px;min-height:46px;padding:0 18px;background:var(--accent);color:var(--on-accent);font-size:15px;font-weight:600;
   display:inline-flex;align-items:center;justify-content:center;gap:8px;letter-spacing:.01em}
 .btn.ghost{background:var(--fill);color:var(--accent)}
 .btn.line{background:transparent;border:1px solid var(--border);color:var(--fg)}
@@ -110,7 +130,7 @@ h3{font-size:12px;font-weight:700;color:var(--fg2);text-transform:uppercase;lett
 .search input{flex:1;border:0;background:transparent;outline:none}
 .chips{display:flex;flex-wrap:wrap;gap:6px}
 .chip{border:1px solid var(--border);border-radius:999px;min-height:30px;padding:0 11px;font-size:13px;font-weight:500;background:var(--fill);color:var(--fg2)}
-.chip.on{background:var(--accent);color:#fff;border-color:var(--accent)}
+.chip.on{background:var(--accent);color:var(--on-accent);border-color:var(--accent)}
 .kpis{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
 @media (min-width:1024px){.kpis{grid-template-columns:repeat(4,minmax(0,1fr))}}
 .kpi{background:var(--card);border:1px solid var(--sep);border-radius:var(--r);padding:14px 16px;display:flex;flex-direction:column;gap:3px}
@@ -235,6 +255,63 @@ a .row:active,button.row:active{background:var(--fill)}
 #side nav a.on{background:rgba(255,255,255,.1)}
 #side .me .av{border-radius:50%}
 .inset,.kpi,.card{box-shadow:0 1px 2px rgba(20,20,15,.04),0 4px 14px rgba(20,20,15,.035)}
+/* ---- tema scuro: rifiniture ---- */
+:root[data-theme=dark] .leaflet-tile-pane{filter:grayscale(1) invert(1) contrast(.85) brightness(.8)}
+@media (prefers-color-scheme:dark){:root:not([data-theme=light]) .leaflet-tile-pane{filter:grayscale(1) invert(1) contrast(.85) brightness(.8)}}
+:root[data-theme=dark] .tipo{color:color-mix(in srgb,var(--tp) 55%,#fff);background:color-mix(in srgb,var(--tp) 28%,transparent)}
+@media (prefers-color-scheme:dark){:root:not([data-theme=light]) .tipo{color:color-mix(in srgb,var(--tp) 55%,#fff);background:color-mix(in srgb,var(--tp) 28%,transparent)}}
+:root[data-theme=dark] .inset,:root[data-theme=dark] .kpi,:root[data-theme=dark] .card{box-shadow:0 1px 0 rgba(255,255,255,.03) inset,0 6px 20px rgba(0,0,0,.25)}
+.modal{backdrop-filter:blur(3px)}
+.modal>div{background:var(--bg)}
+
+/* ---- avatar colorati per agente ---- */
+.av.ag{background:color-mix(in srgb,var(--ac) 16%,var(--card));color:color-mix(in srgb,var(--ac) 80%,var(--fg))}
+.av.big{width:58px;height:58px;border-radius:18px;font-size:19px;background:var(--ac,var(--accent));color:#fff}
+.dot-ag{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--ac);margin-right:5px;vertical-align:1px}
+
+/* ---- skeleton di caricamento ---- */
+@keyframes shimmer{from{background-position:-400px 0}to{background-position:400px 0}}
+.sk{border-radius:12px;background:linear-gradient(90deg,var(--fill) 0,color-mix(in srgb,var(--fill) 55%,var(--card)) 40%,var(--fill) 80%);
+  background-size:800px 100%;animation:shimmer 1.3s linear infinite}
+.sk-t{height:30px;width:42%;margin:6px 0 18px}
+.sk-k{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-bottom:20px}
+@media (min-width:1024px){.sk-k{grid-template-columns:repeat(4,1fr)}}
+.sk-k .sk{height:86px;border-radius:var(--r)}
+.sk-l{background:var(--card);border-radius:var(--r);border:1px solid var(--sep);padding:6px 14px}
+.sk-r{display:flex;gap:12px;align-items:center;padding:10px 0}
+.sk-r .a{width:38px;height:38px;border-radius:12px;flex-shrink:0}
+.sk-r .b{flex:1}.sk-r .b i{display:block;height:12px;margin:5px 0;border-radius:6px}
+
+/* ---- splash ---- */
+#splash{position:fixed;inset:0;z-index:100;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;
+  background:#141211;transition:opacity .45s ease,visibility .45s}
+#splash .logo{width:92px;height:34px;background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 24'%3E%3Ccircle cx='12' cy='12' r='9' fill='none' stroke='%23F6F2EA' stroke-width='2.4'/%3E%3Ccircle cx='32' cy='12' r='9' fill='none' stroke='%23F6F2EA' stroke-width='2.4'/%3E%3Cpath d='M32%203a9%209%200%20000%2018z' fill='%23F6F2EA'/%3E%3Ccircle cx='52' cy='12' r='9' fill='%23F6F2EA'/%3E%3C/svg%3E") center/contain no-repeat;
+  animation:splashIn .7s cubic-bezier(.2,.8,.2,1) both}
+#splash .nm{color:#F6F2EA;font:700 13px/1 var(--font);letter-spacing:.32em;text-transform:uppercase;opacity:.85;animation:splashIn .7s .12s cubic-bezier(.2,.8,.2,1) both}
+@keyframes splashIn{from{opacity:0;transform:translateY(8px) scale(.96)}to{opacity:1;transform:none}}
+#splash.out{opacity:0;visibility:hidden}
+
+/* ---- numeri e grafico in Home ---- */
+.spark{display:flex;align-items:flex-end;gap:4px;height:30px;margin-top:8px}
+.spark i{flex:1;min-height:3px;border-radius:4px;background:color-mix(in srgb,var(--fg) 18%,transparent);transform-origin:bottom;
+  animation:grow .6s cubic-bezier(.2,.8,.2,1) both}
+.spark i.cur{background:#7A1F2B}
+:root[data-theme=dark] .spark i.cur{background:#C9536A}
+@media (prefers-color-scheme:dark){:root:not([data-theme=light]) .spark i.cur{background:#C9536A}}
+@keyframes grow{from{transform:scaleY(0)}to{transform:none}}
+
+/* ---- carrello mobile ---- */
+.cartbtn{position:relative;flex-shrink:0;width:48px;height:48px;border-radius:50%;border:0;background:var(--fill);color:var(--fg);
+  display:flex;align-items:center;justify-content:center}
+.cartbtn .badge{position:absolute;top:-3px;right:-3px;min-width:21px;height:21px;padding:0 6px;border-radius:999px;background:#7A1F2B;color:#fff;
+  font-size:11.5px;font-weight:700;display:flex;align-items:center;justify-content:center;box-shadow:0 0 0 2px var(--card)}
+.cartbtn .badge.bump{animation:bump .45s cubic-bezier(.3,1.6,.5,1)}
+@keyframes bump{0%{transform:scale(1)}40%{transform:scale(1.35)}100%{transform:scale(1)}}
+.sheet .tot{flex:1;min-width:0;text-align:left;background:none;border:0;padding:0}
+
+/* ---- selettore tema ---- */
+.theme-btn{display:inline-flex;align-items:center;gap:6px}
+#side .theme-btn{margin:0 10px;justify-content:flex-start;border-color:rgba(255,255,255,.18)!important;color:#D8D8D2!important}
 @media (prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important}}
 .inset{overflow:clip}
 .grp-n{padding:12px 14px 6px;font-size:13px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--fg);
@@ -272,7 +349,8 @@ a .row:active,button.row:active{background:var(--fill)}
 </style>
 </head>
 <body>
-<div id="root"><div class="spin"></div></div>
+<div id="splash" aria-hidden="true"><div class="logo"></div><div class="nm">Wine Alchemist</div></div>
+<div id="root"></div>
 
 <script>
 window.WA_CONFIG = {
@@ -289,7 +367,7 @@ window.WA_CONFIG = {
 <script src="crm_map.js?v=6"></script>
 <script src="crm_insights.js?v=5"></script>
 <script src="crm_client_form.js?v=7"></script>
-<script src="crm.js?v=12"></script>
+<script src="crm.js?v=13"></script>
 <script>
 // Diagnostica: se dopo 9 secondi l'app non è partita, dice cosa manca invece di girare a vuoto.
 (function () {
@@ -305,6 +383,7 @@ window.WA_CONFIG = {
       ['crm_client_form.js', c('CrmClientForm')], ['crm.js', c('CRM')],
       ['libreria Supabase', c('supabase')], ['Leaflet', c('L')]
     ];
+    var sp = document.getElementById('splash'); if (sp) sp.remove();
     document.getElementById('root').innerHTML =
       '<div id="login"><div style="max-width:420px;width:100%">' +
       '<div class="brand" style="text-align:center">Wine Alchemist</div>' +
