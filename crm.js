@@ -559,7 +559,11 @@ function editCliente(c, contatti = [], sezione) {
     const el = m.querySelector(`[data-sec="${sezione}"]`); if (!el) return;
     const box = m.firstElementChild;
     const top = el.getBoundingClientRect().top - box.getBoundingClientRect().top + box.scrollTop - 12;
-    box.scrollTo({ top, behavior: 'smooth' });
+    const y0 = box.scrollTop, t0 = performance.now(), dur = 450;
+    const passo = t => { const k = Math.min(1, (t - t0) / dur), e = 1 - Math.pow(1 - k, 3);
+      box.scrollTop = y0 + (top - y0) * e; if (k < 1) requestAnimationFrame(passo); };
+    requestAnimationFrame(passo);
+    setTimeout(() => { if (Math.abs(box.scrollTop - top) > 20) box.scrollTop = top; }, dur + 150);
     el.classList.add('flash'); setTimeout(() => el.classList.remove('flash'), 1600);
   }, 420);
   m.querySelector('[data-x]').addEventListener('click', () => m.remove());
