@@ -1276,6 +1276,58 @@ addRoute('ordine', async (id, extra) => {
     render();
   }
 
+  // promo "sconto merce": l'agente sceglie la referenza (di solito la meno cara dell'ordine)
+  const idonea = w => !w.no_sconto && w.disponibilita !== 'assegnazione' && w.tipologia !== 'accessorio';
+  async function togliPromo() {
+    if (pend.size || flushing) { clearTimeout(flushT); await flush(); }
+    const wid = o.omaggio_wine_id, n = o.omaggio_bt || 0, row = wid && srv.get(wid);
+    if (row && n) {
+      const q = Math.max(0, row.qty - n), qo = Math.max(0, (row.qty_omaggio || 0) - n);
+      const r = q ? await sb.from('order_items').update({ qty: q, qty_omaggio: Math.min(qo, q) }).eq('id', row.id).select().single()
+                  : await sb.from('order_items').delete().eq('id', row.id);
+      if (r.error) throw r.error;
+      if (q) { srv.set(wid, r.data); items.set(wid, { ...r.data }); } else { srv.delete(wid); items.delete(wid); }
+    }
+    const u = await sb.from('orders').update({ applica_omaggio: false, omaggio_wine_id: null, omaggio_bt: 0 }).eq('id', o.id).select().single();
+    if (u.error) throw u.error;
+    Object.assign(o, u.data);
+  }
+  async function applicaPromo(wid) {
+    if (o.applica_omaggio) await togliPromo();
+    const n = o.omaggio_possibile, row = srv.get(wid);
+    if (!row || !n) throw new Error('Referenza non presente nell\'ordine');
+    const r = await sb.from('order_items').update({ qty: row.qty + n, qty_omaggio: (row.qty_omaggio || 0) + n }).eq('id', row.id).select().single();
+    if (r.error) throw r.error;
+    srv.set(wid, r.data); items.set(wid, { ...r.data });
+    const u = await sb.from('orders').update({ applica_omaggio: true, omaggio_wine_id: wid, omaggio_bt: n }).eq('id', o.id).select().single();
+    if (u.error) throw u.error;
+    Object.assign(o, u.data);
+  }
+  function scegliOmaggio() {
+    go(async () => {
+      if (pend.size || flushing) { clearTimeout(flushT); await flush(); }
+      const n = o.omaggio_possibile;
+      const cand = catalogo.filter(w => items.has(w.id) && idonea(w)).sort((a, b) => num(a.prezzo_listino) - num(b.prezzo_listino));
+      if (!n) return toast('L\'ordine non raggiunge ancora la soglia della promo');
+      if (!cand.length) return toast('Nessuna referenza dell\'ordine può andare in omaggio');
+      const sel = o.omaggio_wine_id || cand[0].id;
+      const m = modal(`<div class="bar"><h2>Sconto merce · ${n} bt</h2><span style="flex:1"></span><button class="btn line sm" data-x>Chiudi</button></div>
+        <div class="sub" style="padding:0 4px 12px">Scegli quale referenza dell'ordine regalare. Le ${n} bottiglie si aggiungono alla riga come omaggio (a costo zero). In cima le meno care.</div>
+        <div class="inset">${cand.map(w => `<label class="row" style="cursor:pointer">
+          <input type="radio" name="om" value="${w.id}" ${w.id === sel ? 'checked' : ''} style="width:20px;height:20px;accent-color:#7A1F2B">
+          <span style="flex:1;min-width:0">${nomeVino(w)}<span class="sub">${items.get(w.id).qty} bt nell'ordine</span></span>
+          <span class="mono">${eur(w.prezzo_listino)}</span></label>`).join('')}</div>
+        <button class="btn" id="omOk" style="width:100%;margin-top:14px">Metti ${n} bt in omaggio</button>`);
+      m.querySelector('[data-x]').addEventListener('click', () => m.remove());
+      $('#omOk', m).addEventListener('click', () => go(async () => {
+        const wid = m.querySelector('input[name=om]:checked')?.value; if (!wid) return;
+        $('#omOk', m).disabled = true;
+        try { await applicaPromo(wid); m.remove(); toast('Omaggio applicato'); render(); }
+        finally { const b = $('#omOk', m); if (b) b.disabled = false; }
+      }));
+    });
+  }
+
   const rigaVino = w => {
     const it = items.get(w.id), q = it ? it.qty : 0, s = ST[w.id] || {};
     const disp = w.gestione_giacenza ? `Libere ${s.disponibile ?? 0}` : lbl(w.disponibilita);
@@ -1376,9 +1428,12 @@ addRoute('ordine', async (id, extra) => {
             ${editabile
               ? `<input id="scontoCli" type="number" min="0" max="100" step="0.5" inputmode="decimal" class="num-in" value="${f.sconto || 0}"> %`
               : `<span class="v mono">${f.sconto ? f.sconto + '%' : '—'}</span>`}</div>
-          ${o.omaggio_possibile > 0 ? `<div class="row"><label for="oProm">Promo: ${o.omaggio_possibile} bt in omaggio</label>
-            <span style="margin-left:auto;display:flex;align-items:center;gap:8px"><span class="sub">${o.applica_omaggio ? 'applicata' : 'non applicata'}</span>
-            <input id="oProm" type="checkbox" class="sw" ${o.applica_omaggio ? 'checked' : ''} ${editabile ? '' : 'disabled'}></span></div>` : ''}
+          ${o.omaggio_possibile > 0 || o.applica_omaggio ? `<div class="row"><label for="oProm">Promo ${o.omaggio_possibile || ''} bt in omaggio
+              ${o.applica_omaggio ? `<br><span class="sub" style="color:var(--green)">${o.omaggio_bt} bt di ${esc(catalogo.find(w => w.id === o.omaggio_wine_id)?.nome || '')}</span>` : ''}
+              ${o.applica_omaggio && !o.omaggio_possibile ? '<br><span class="sub" style="color:var(--orange)">L\'ordine è sceso sotto la soglia: togli l\'omaggio</span>' : ''}</label>
+            <span style="margin-left:auto;display:flex;align-items:center;gap:8px">
+              ${o.applica_omaggio && editabile ? '<button class="btn line sm" id="oPromCambia">Cambia</button>' : ''}
+              <input id="oProm" type="checkbox" class="sw" ${o.applica_omaggio ? 'checked' : ''} ${editabile ? '' : 'disabled'}></span></div>` : ''}
           <div class="row"><label for="oCons">Consegna richiesta</label>
             <input id="oCons" type="date" value="${o.data_consegna || ''}" ${editabile ? '' : 'disabled'}></div>
           <div class="row col"><label for="oNote">Note ordine</label>
@@ -1490,11 +1545,11 @@ addRoute('ordine', async (id, extra) => {
       else if (res === 'off') mailOrdine(o, [...items.values()], cli);
       else toast('Email non inviata: ' + res, 6000);
     }));
-    $('#oProm')?.addEventListener('change', e => go(async () => {
-      const r = await sb.from('orders').update({ applica_omaggio: e.target.checked }).eq('id', o.id).select().single();
-      if (r.error) throw r.error;
-      Object.assign(o, r.data); render();
-    }));
+    $('#oProm')?.addEventListener('change', e => {
+      if (e.target.checked) { e.target.checked = false; scegliOmaggio(); }
+      else go(async () => { await togliPromo(); render(); });
+    });
+    $('#oPromCambia')?.addEventListener('click', () => scegliOmaggio());
     [['#oNote', 'note'], ['#oCons', 'data_consegna']].forEach(([id, k]) => {
       const el = $(id); if (!el || el.disabled) return;
       el.addEventListener('change', e => go(async () => {
