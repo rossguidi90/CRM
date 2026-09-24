@@ -1861,8 +1861,9 @@ addRoute('provvigioni', async () => {
   const y = o => new Date(o.inviato_at || o.created_at).getFullYear();
   const isGr = o => !!S.clients.find(c => c.id === o.client_id)?.gruppo;
   const chiusi = o => o.stato === 'confermato' || o.stato === 'evaso';
-  const prec = (ords || []).filter(o => y(o) === anno - 1 && chiusi(o));
-  const fattPrec = prec.filter(o => !isGr(o)).reduce((s, o) => s + num(o.totale), 0);
+  const [{ data: sPrec }, { data: sCur }] = await Promise.all([
+    sb.rpc('fatturato_soglia', { p_anno: anno - 1 }), sb.rpc('fatturato_soglia', { p_anno: anno })]);
+  const fattPrec = num(sPrec), fattSoglia = num(sCur);   // fatturato congiunto di chi ha le provvigioni, gruppo escluso
   const pct = fattPrec >= PROV.soglia ? PROV.alta : PROV.base;
   const cur = (ords || []).filter(o => y(o) === anno).map(o => {
     const gr = isGr(o), p = gr ? PROV.gruppo : pct;
@@ -1885,15 +1886,16 @@ addRoute('provvigioni', async () => {
     <div class="kpis">
       ${kpi('Provvigioni maturate', eur(provOk), `${ok.length} ordini confermati o evasi`)}
       ${kpi('In attesa di conferma', eur(provAtt), `${att.length} ordini inviati`, att.length ? 'orange' : '')}
-      ${kpi('Aliquota catalogo ' + anno, pct + '%', fattPrec >= PROV.soglia ? `${anno - 1} sopra i ${eur(PROV.soglia)}` : `${anno - 1}: ${eur(fattPrec)}`)}
+      ${kpi('Aliquota catalogo ' + anno, pct + '%', `${anno - 1} insieme: ${eur(fattPrec)}`)}
       ${kpi('Ristoranti del gruppo', PROV.gruppo + '%', `fatturato ${eur(fattGr)}`)}
     </div>
     <div class="group"><h3>Verso il ${PROV.alta}% nel ${anno + 1}</h3><div class="card">
       <div style="display:flex;justify-content:space-between;align-items:baseline;gap:10px;flex-wrap:wrap">
-        <span><b class="mono" style="font-size:20px">${eur(fattCat)}</b> <span class="sub">di ${eur(PROV.soglia)} · fatturato catalogo ${anno}</span></span>
-        <span class="sub">${fattCat >= PROV.soglia ? `✓ Soglia superata: nel ${anno + 1} provvigioni al ${PROV.alta}%` : `Mancano ${eur(PROV.soglia - fattCat)}`}</span></div>
-      <div class="meter"><i style="width:${perc(fattCat / PROV.soglia)}%"></i></div>
-      <div class="sub" style="margin-top:8px">Se il fatturato annuo supera ${eur(PROV.soglia)}, l'anno successivo la provvigione sul catalogo sale al ${PROV.alta}%; se scende sotto, torna al ${PROV.base}%. Gli ordini dei ristoranti del gruppo restano al ${PROV.gruppo}% e non contano per la soglia.</div>
+        <span><b class="mono" style="font-size:20px">${eur(fattSoglia)}</b> <span class="sub">di ${eur(PROV.soglia)} · fatturato catalogo ${anno} di ${esc(Object.values(S.agents).filter(a => a.provvigioni).map(a => a.nome).join(' e '))} insieme</span></span>
+        <span class="sub">${fattSoglia >= PROV.soglia ? `✓ Soglia superata: nel ${anno + 1} provvigioni al ${PROV.alta}%` : `Mancano ${eur(PROV.soglia - fattSoglia)}`}</span></div>
+      <div class="meter"><i style="width:${perc(fattSoglia / PROV.soglia)}%"></i></div>
+      <div class="sub" style="margin-top:6px">Di cui ordini di ${esc(ag.nome)}: ${eur(fattCat)}</div>
+      <div class="sub" style="margin-top:8px">Se il fatturato annuo complessivo supera ${eur(PROV.soglia)}, l'anno successivo la provvigione sul catalogo sale al ${PROV.alta}%; se scende sotto, torna al ${PROV.base}%. Gli ordini dei ristoranti del gruppo restano al ${PROV.gruppo}% e non contano per la soglia.</div>
     </div></div>
     <div class="group"><h3>Campionatura ${anno}</h3><div class="card">
       <div style="display:flex;justify-content:space-between;align-items:baseline;gap:10px;flex-wrap:wrap">
