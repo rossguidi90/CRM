@@ -778,7 +778,7 @@ async function duplicaOrdine(id) {
   const [{ data: o, error }, { data: righe }] = await Promise.all([
     sb.from('orders').select('*').eq('id', id).single(), sb.from('order_items').select('*').eq('order_id', id)]);
   if (error) throw error;
-  const ins = await sb.from('orders').insert({ client_id: o.client_id, agent_id: S.me.id, pagamento: o.pagamento,
+  const ins = await sb.from('orders').insert({ client_id: o.client_id, agent_id: S.me.id, pagamento: o.pagamento, iban: o.iban,
     sconto_cliente_pct: o.sconto_cliente_pct, note: o.note }).select().single();
   if (ins.error) throw ins.error;
   if ((righe || []).length) {
@@ -1435,6 +1435,9 @@ addRoute('ordine', async (id, extra) => {
               ${['anticipato', 'bonifico_30', 'riba_60'].map(p =>
                 `<option value="${p}" ${o.pagamento === p ? 'selected' : ''}>${lbl(p)}</option>`).join('')}
             </select></div>
+          ${o.pagamento === 'riba_60' ? `<div class="row"><label for="oIban">IBAN cliente${o.iban && !ibanOk(o.iban) ? '<br><span class="sub" style="color:var(--red)">IBAN non valido</span>' : !o.iban ? '<br><span class="sub" style="color:var(--orange)">Obbligatorio per Ri.Ba.</span>' : ''}</label>
+            <input id="oIban" type="text" class="mono" autocomplete="off" autocapitalize="characters" spellcheck="false" maxlength="42"
+              placeholder="IT00 X000 0000 0000 0000 0000 000" value="${esc(ibanFmt(o.iban))}" ${editabile ? '' : 'disabled'} style="flex:1;min-width:0;max-width:320px;margin-left:auto;text-transform:uppercase"></div>` : ''}
           <div class="row"><label for="scontoCli">Sconto cliente</label>
             ${editabile
               ? `<input id="scontoCli" type="number" min="0" max="100" step="0.5" inputmode="decimal" class="num-in" value="${f.sconto || 0}"> %`
@@ -1561,12 +1564,13 @@ addRoute('ordine', async (id, extra) => {
       else go(async () => { await togliPromo(); render(); });
     });
     $('#oPromCambia')?.addEventListener('click', () => scegliOmaggio());
-    [['#oNote', 'note'], ['#oCons', 'data_consegna']].forEach(([id, k]) => {
+    [['#oNote', 'note'], ['#oCons', 'data_consegna'], ['#oIban', 'iban']].forEach(([id, k]) => {
       const el = $(id); if (!el || el.disabled) return;
       el.addEventListener('change', e => go(async () => {
         const r = await sb.from('orders').update({ [k]: e.target.value.trim() || null }).eq('id', o.id).select().single();
         if (r.error) throw r.error;
-        Object.assign(o, r.data); toast('Salvato');
+        Object.assign(o, r.data);
+        if (k === 'iban') render(); else toast('Salvato');
       }));
     });
     const delB = $('#delOrd');
@@ -1579,6 +1583,8 @@ addRoute('ordine', async (id, extra) => {
     }));
     document.querySelectorAll('[data-go]').forEach(b => b.addEventListener('click', () => go(async () => {
       if (pend.size || flushing) { clearTimeout(flushT); await flush(); }
+      if (b.dataset.go === 'inviato' && o.pagamento === 'riba_60' && !ibanOk(o.iban)) {
+        toast('Pagamento Ri.Ba.: inserisci un IBAN valido prima di inviare', 4000); $('#oIban')?.focus(); return; }
       const fuori = scelti.filter(fz);
       if (b.dataset.go === 'inviato' && fuori.length &&
           !confirm(`Attenzione: l'ordine contiene ${fuori.length} referenz${fuori.length === 1 ? 'a' : 'e'} fuori zona:\n\n` +
@@ -1601,6 +1607,15 @@ addRoute('ordine', async (id, extra) => {
   render();
 }, 'ordini');
 
+const ibanNorm = v => String(v || '').replace(/\s+/g, '').toUpperCase();
+const ibanFmt = v => ibanNorm(v).replace(/(.{4})(?=.)/g, '$1 ');
+function ibanOk(v) {
+  const s = ibanNorm(v);
+  if (!/^[A-Z]{2}\d{2}[A-Z0-9]{11,30}$/.test(s) || (s.startsWith('IT') && s.length !== 27)) return false;
+  let m = 0;
+  for (const c of s.slice(4) + s.slice(0, 4)) { const n = parseInt(c, 36); m = (m * (n > 9 ? 100 : 10) + n) % 97; }
+  return m === 1;
+}
 function datiCli(o, c) {
   if (o?.dati_cliente) return o.dati_cliente;
   c = c || {};
@@ -1665,6 +1680,7 @@ function testoOrdine(o, items, cli) {
     `Totale (iva escl.): ${eur(o.totale)}`,
     o.porto_franco ? 'Porto franco' : 'Trasporto a carico del cliente',
     `Pagamento: ${lbl(o.pagamento)}`,
+    o.pagamento === 'riba_60' && o.iban ? `IBAN: ${ibanFmt(o.iban)}` : '',
     o.data_consegna ? `Consegna richiesta: ${dmy(o.data_consegna)}` : '',
     o.note ? `Note: ${o.note}` : '',
     '—',
@@ -1710,6 +1726,7 @@ function pdfOrdine(o, items, cli) {
       ${D.finestra_consegna ? `<br>Orari consegna: ${esc(D.finestra_consegna)}` : ''}
       ${D.note_consegna ? `<br><span class="muted">${esc(D.note_consegna)}</span>` : ''}</div>
     <div class="box"><h3>Condizioni</h3>Pagamento: ${esc(lbl(o.pagamento))}
+      ${o.pagamento === 'riba_60' && o.iban ? `<br>IBAN: <span class="mono">${esc(ibanFmt(o.iban))}</span>` : ''}
       ${o.data_consegna ? `<br>Consegna richiesta: ${dmy(o.data_consegna)}` : ''}
       <br>${o.porto_franco ? 'Porto franco' : 'Trasporto a carico del cliente'}
       ${ag ? `<br>Agente: ${esc(ag.nome)}` : ''}</div>
