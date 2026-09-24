@@ -192,6 +192,8 @@ const isViewer = () => S.me?.ruolo === 'viewer';
 const mine = c => c.agent_id === S.me.id;
 const canEdit = c => isAdmin() || mine(c);
 const canOrder = c => isAdmin() || isViewer() || mine(c);
+const PROSPECT = ['prospect', 'contattato', 'visitato', 'trattativa'];
+const scadeProspect = c => { const d = new Date(c.assegnato_at); d.setMonth(d.getMonth() + 3); return d.toISOString(); };
 
 function setNav(k) {
   document.querySelectorAll('[data-nav]').forEach(a => a.classList.toggle('on', a.dataset.nav === k));
@@ -293,6 +295,7 @@ const rowLink = (href, ttl, sub, right = '', av = true, col = '') => `<a href="$
 /* ---------- Clienti ---------- */
 async function ensureClients(force) {
   if (S.clients.length && !force) return S.clients;
+  await sb.rpc('libera_prospect_scaduti').then(() => {}, () => {}); // prospect non convertiti da 3 mesi tornano liberi
   const { data, error } = await sb.from('clients').select('*').order('ragione_sociale');
   if (error) throw error;
   S.clients = data || [];
@@ -321,7 +324,7 @@ addRoute('clienti', async () => {
     else list.sort((a, b) => nm(a).localeCompare(nm(b), 'it'));
     $('#lista').innerHTML = list.map(c => rowLink(`#/cliente/${c.id}`, c.insegna || c.ragione_sociale,
       [lbl(c.tipologia), c.zona || c.citta, F.sort === 'ordine' ? (last[c.id] ? 'ultimo ordine ' + dmy(last[c.id]) : 'mai ordinato') : null].filter(Boolean).join(' · '),
-      `<span class="tags">${pill(c.stato)}<span class="pill"><i class="dot-ag" style="--ac:${S.agents[c.agent_id]?.colore || 'var(--fg3)'}"></i>${esc(S.agents[c.agent_id]?.nome?.split(' ')[0] || '—')}</span></span>`,
+      `<span class="tags">${pill(c.stato)}<span class="pill"><i class="dot-ag" style="--ac:${S.agents[c.agent_id]?.colore || 'var(--fg3)'}"></i>${esc(S.agents[c.agent_id]?.nome?.split(' ')[0] || (c.agent_id ? '—' : 'Libero'))}</span></span>`,
       true, S.agents[c.agent_id]?.colore)).join('')
       || '<div class="empty">Nessun cliente con questi filtri.</div>';
     $('#cnt').textContent = list.length + ' clienti';
@@ -389,7 +392,8 @@ addRoute('cliente', async (id) => {
       <a href="#/clienti" class="btn line sm" aria-label="Clienti">‹<span class="hide-m">&nbsp;Clienti</span></a>
       <span style="flex:1"></span>
       ${ed ? `<button class="btn line sm" id="att">Attività</button>
-              <button class="btn line sm" id="mod">Modifica</button>` : '<span class="pill">Sola lettura</span>'}
+              <button class="btn line sm" id="mod">Modifica</button>` : !c.agent_id ? '<span class="pill">Libero</span><button class="btn sm" id="prendi">Prendi in carico</button>' : '<span class="pill">Sola lettura</span>'}
+      ${c.agent_id && c.assegnato_at && PROSPECT.includes(c.stato) && (mine(c) || isAdmin()) ? `<span class="pill" title="Se non diventa cliente entro questa data torna libero per tutti">libero dal ${dmy(scadeProspect(c))}</span>` : ''}
       ${canOrder(c) ? '<button class="btn sm" id="ord">Nuovo ordine</button>' : ''}
     </div>
     <div class="row" style="padding:0 4px 12px;border:0;align-items:flex-start">
@@ -480,6 +484,12 @@ addRoute('cliente', async (id) => {
         || '<div class="empty">Nessun ordine registrato.</div>'}
     </div></div>`);
   $('#ord')?.addEventListener('click', () => (location.hash = '#/ordine/nuovo/' + c.id));
+  $('#prendi')?.addEventListener('click', () => go(async () => {
+    const { error } = await sb.rpc('prendi_cliente', { p_id: c.id });
+    if (error) throw error;
+    toast('Cliente preso in carico: hai 3 mesi per convertirlo');
+    S.clients = []; route();
+  }));
   if (ed) {
     const MAPPA = { 'Referenti': 'contatti', 'Spedizione e fatturazione': 'amministrazione', 'Condizioni commerciali': 'amministrazione',
       'Profilo carta vini': 'carta', 'Note / Diario': 'note' };
@@ -1214,7 +1224,7 @@ addRoute('ordine', async (id, extra) => {
   const catalogo = ordinaCat((ws || []).filter(w => ST[w.id]?.vendibile ||
     (fz(w) && w.prezzo_listino != null && !['esaurito', 'in_arrivo'].includes(w.disponibilita))));
   const items = new Map((rows || []).map(i => [i.wine_id, i]));
-  const editabile = o.stato === 'bozza' && (isAdmin() || o.agent_id === S.me.id);
+  let editabile = o.stato === 'bozza' && (isAdmin() || o.agent_id === S.me.id);
   const boss = isAdmin() || isViewer();
   const passo = () => 1; // singola bottiglia per click, sempre (nessun vincolo di cartone)
   let sort0 = 'zona'; try { sort0 = localStorage.getItem('crm.catSort') || 'zona'; } catch {}
@@ -1416,10 +1426,11 @@ addRoute('ordine', async (id, extra) => {
           <div class="row"><label>Totale</label><span class="v mono" style="font-size:19px;font-weight:700;color:var(--fg)">${eur(o.totale)}</span></div>
 `;
     const azioni = [];
-    if (editabile) azioni.push(['inviato', 'Invia ordine', 'btn']);
+    if (editabile && o.stato === 'bozza') azioni.push(['inviato', 'Invia ordine', 'btn']);
     if ((isAdmin() || isViewer()) && o.stato === 'inviato') azioni.push(['confermato', 'Conferma', 'btn'], ['annullato', 'Annulla', 'btn ghost']);
     if ((isAdmin() || isViewer()) && o.stato === 'confermato') azioni.push(['evaso', 'Segna evaso', 'btn']);
 
+    const mio = isAdmin() || o.agent_id === S.me.id;
     const y0 = f.primo ? 0 : window.scrollY, cy0 = $('.ord-cart')?.scrollTop || 0;
     f.primo = false;
     paint(`<div class="ord-layout">
@@ -1427,12 +1438,20 @@ addRoute('ordine', async (id, extra) => {
         <div class="bar acts"><a href="#/ordini" class="btn line sm" aria-label="Ordini">‹<span class="hide-m">&nbsp;Ordini</span></a><span style="flex:1"></span>
           <button class="btn line sm" id="pdfOrd" aria-label="PDF">${svg('doc', 16)}<span class="hide-m">&nbsp;PDF</span></button>
           <button class="btn line sm" id="dup">Duplica</button>
-          ${o.stato === 'bozza' && (isAdmin() || o.agent_id === S.me.id) ? '<button class="btn line sm" id="delOrd" style="color:var(--red)">Elimina</button>' : ''}
+          ${mio && (o.stato === 'annullato' || (o.stato === 'inviato' && !isAdmin())) ? '<button class="btn line sm" id="riapri">Modifica</button>' : ''}
+          ${isAdmin() && ['inviato', 'confermato', 'evaso'].includes(o.stato) && !f.mod ? '<button class="btn line sm" id="modOrd">Modifica</button>' : ''}
+          ${(o.stato === 'bozza' && mio) || isAdmin() ? '<button class="btn line sm" id="delOrd" style="color:var(--red)">Elimina</button>' : ''}
           <button class="btn line sm" id="mailOrd" aria-label="Email">${svg('mail', 16)}<span class="hide-m">&nbsp;Email</span></button>
           <button class="btn line sm" id="waOrd" aria-label="WhatsApp">${svg('chat', 16)}<span class="hide-m">&nbsp;WhatsApp</span></button></div>
         <h1 class="mono" style="font-size:22px;display:flex;align-items:center;gap:10px;flex-wrap:wrap">${esc(o.numero)} ${pill(o.stato)}
           ${o.email_inviata_at ? `<span class="pill attivo" style="font-family:var(--font)">✓ email inviata ${dmy(o.email_inviata_at)}</span>` : ''}
           ${o.stato !== 'bozza' && !o.email_inviata_at && (isAdmin() || o.agent_id === S.me.id) ? '<button class="btn line sm" id="reMail" style="font-family:var(--font)">Invia email ora</button>' : ''}</h1>
+        ${f.mod ? `<div class="inset" style="margin-top:10px;padding:10px 12px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;border:1px solid var(--orange)">
+          <span style="flex:1;min-width:200px"><b>Modifica ordine ${esc(lbl(o.stato).toLowerCase())}</b><br><span class="sub">Le modifiche si salvano subito. Lo stato resta invariato.</span></span>
+          <button class="btn sm" id="fineMod">Fine modifiche</button></div>`
+        : isAdmin() && o.stato === 'inviato' ? `<div class="inset" style="margin-top:10px;padding:10px 12px;display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+          <span style="flex:1;min-width:200px"><b>In attesa di conferma</b><br><span class="sub">Quando è approvato, segnalo qui: entra nel fatturato del mese.</span></span>
+          <button class="btn sm" data-go="confermato">Segna confermato</button></div>` : ''}
         <div class="inset" style="margin-top:12px">
           <a href="#/cliente/${cli.id}"><div class="row">
             <span class="av">${esc(ini(cli.insegna || cli.ragione_sociale || '?'))}</span>
@@ -1587,11 +1606,34 @@ addRoute('ordine', async (id, extra) => {
     });
     const delB = $('#delOrd');
     if (delB) delB.addEventListener('click', () => go(async () => {
-      if (!confirm(`Eliminare definitivamente la bozza ${o.numero}?`)) return;
-      const r = await sb.from('orders').delete().eq('id', o.id);
+      const cosa = o.stato === 'bozza' ? 'la bozza' : `l'ordine (${lbl(o.stato).toLowerCase()})`;
+      if (!confirm(`Eliminare definitivamente ${cosa} ${o.numero}?\n\nL'operazione non si può annullare.`)) return;
+      const r = await sb.from('orders').delete().eq('id', o.id).select('id');
       if (r.error) throw r.error;
-      toast('Bozza eliminata');
+      if (!r.data?.length) throw new Error('Eliminazione non consentita dai permessi del database');
+      toast(o.stato === 'bozza' ? 'Bozza eliminata' : 'Ordine eliminato');
       location.hash = '#/ordini';
+    }));
+    $('#modOrd')?.addEventListener('click', () => { f.mod = true; editabile = true; render(); });
+    $('#fineMod')?.addEventListener('click', () => go(async () => {
+      if (pend.size || flushing) { clearTimeout(flushT); await flush(); }
+      f.mod = false; editabile = false;
+      if (confirm(`Inviare l'email con l'ordine ${o.numero} aggiornato?`)) {
+        const res = await inviaEmailOrdine(o.id);
+        if (res === 'ok') toast('Email aggiornata inviata a ' + ORD_EMAIL_TO[0], 4000);
+        else if (res === 'off') mailOrdine(o, [...items.values()], cli);
+        else toast('Email non partita: ' + res + '. Usa il tasto Email.', 6000);
+      } else toast('Modifiche salvate');
+      route();
+    }));
+    $('#riapri')?.addEventListener('click', () => go(async () => {
+      if (!confirm(`Riaprire ${o.numero} per modificarlo?\n\nTorna in bozza: potrai cambiarlo e poi premere di nuovo "Invia ordine".` +
+        (o.email_inviata_at ? '\nL\'email è già partita: al nuovo invio ne partirà una aggiornata.' : ''))) return;
+      let r = await sb.from('orders').update({ stato: 'bozza', email_inviata_at: null }).eq('id', o.id).select().single();
+      if (r.error) r = await sb.from('orders').update({ stato: 'bozza' }).eq('id', o.id).select().single();
+      if (r.error) throw r.error;
+      toast('Ordine riaperto: ora puoi modificarlo');
+      route();
     }));
     document.querySelectorAll('[data-go]').forEach(b => b.addEventListener('click', () => go(async () => {
       if (pend.size || flushing) { clearTimeout(flushT); await flush(); }
