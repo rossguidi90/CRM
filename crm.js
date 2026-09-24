@@ -557,10 +557,11 @@ function editCliente(c, contatti = [], sezione) {
   draw(c || {}, contatti);
   if (sezione) setTimeout(() => {
     const el = m.querySelector(`[data-sec="${sezione}"]`); if (!el) return;
-    el.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    el.classList.add('flash'); setTimeout(() => el.classList.remove('flash'), 1400);
-    el.querySelector('input,select,textarea')?.focus({ preventScroll: true });
-  }, 380);
+    const box = m.firstElementChild;
+    const top = el.getBoundingClientRect().top - box.getBoundingClientRect().top + box.scrollTop - 12;
+    box.scrollTo({ top, behavior: 'smooth' });
+    el.classList.add('flash'); setTimeout(() => el.classList.remove('flash'), 1600);
+  }, 420);
   m.querySelector('[data-x]').addEventListener('click', () => m.remove());
   CrmClientForm.bind(host, {
     rerender: ({ client, contacts }) => draw(client, contacts),
