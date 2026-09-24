@@ -48,7 +48,7 @@ self.addEventListener('fetch', e => {
   const req = e.request, url = new URL(req.url);
   if (url.pathname.includes('/auth/v1/') || url.pathname.includes('/functions/v1/')) return;   // login e invii: mai dalla cache
   if (url.hostname.endsWith('tile.openstreetmap.org')) { e.respondWith(tiles(req)); return; }
-  if (url.origin === location.origin && url.pathname.includes('/foto/')) { e.respondWith(tiles(req, '-foto')); return; }   // foto immutabili
+  if ((url.origin === location.origin && url.pathname.includes('/foto/')) || url.pathname.includes('/storage/v1/object/public/vini/')) { e.respondWith(tiles(req, '-foto')); return; }   // foto immutabili
   const dati = url.pathname.includes('/rest/v1/');
   if (req.method === 'GET' && (url.origin === location.origin || dati ||
       url.hostname === 'cdnjs.cloudflare.com' || url.hostname === 'cdn.jsdelivr.net')) {

@@ -191,6 +191,7 @@ input.q:focus{outline:2px solid var(--accent);outline-offset:0}
 .thumb{flex:0 0 auto;width:44px;height:58px;border-radius:12px;overflow:hidden;background:var(--fill);display:grid;place-items:center}
 .thumb img{width:100%;height:100%;object-fit:cover}.thumb svg{height:40px;width:auto}
 .thumb[data-zoom]{cursor:zoom-in}
+.thumb img[src*=".webp?"],.fotobig img[src*=".webp?"],.lightbox img[src*=".webp?"]{object-fit:contain;padding:5%;background:linear-gradient(#faf9f6,#ece8e2)}
 .fotobig{display:grid;place-items:center;margin:0 auto 14px;width:min(240px,62vw);aspect-ratio:3/4;border-radius:22px;overflow:hidden;background:var(--fill);box-shadow:0 8px 28px rgba(0,0,0,.08)}
 .fotobig img{width:100%;height:100%;object-fit:cover}.fotobig svg{height:60%;width:auto}
 .lightbox{position:fixed;inset:0;z-index:999;background:rgba(20,16,14,.78);display:grid;place-items:center;padding:24px;animation:fade .2s ease;cursor:zoom-out}
@@ -408,7 +409,7 @@ if ('serviceWorker' in navigator) addEventListener('load', () => navigator.servi
 <script src="crm_map.js?v=7"></script>
 <script src="crm_insights.js?v=5"></script>
 <script src="crm_client_form.js?v=9"></script>
-<script src="crm.js?v=25"></script>
+<script src="crm.js?v=26"></script>
 <script>
 // Diagnostica: se dopo 9 secondi l'app non è partita, dice cosa manca invece di girare a vuoto.
 (function () {
