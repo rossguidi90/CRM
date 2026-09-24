@@ -900,6 +900,16 @@ const inZona = (w, z) => !z || (z.startsWith('N:') ? nazW(w) === z.slice(2) : `R
 const nomeVino = w => `<span class="prod">${esc(w.produttore || '—')}</span>
   <span class="wn">${tipoTag(w)}${esc(w.nome)}${w.annata ? ' <span class="ann">' + esc(w.annata) + '</span>' : ''}</span>
   ${w.vitigni ? `<span class="vit">${esc(w.vitigni)}</span>` : ''}`;
+const bottSvg = t => `<svg viewBox="0 0 24 64" aria-hidden="true"><path fill="${tcol(t)}" opacity=".55" d="M9 2h6v14c0 3 5 6 5 12v32a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V28c0-6 5-9 5-12z"/></svg>`;
+const fotoVino = (w, m) => `<span class="${m === 'big' ? 'fotobig' : 'thumb'}"${w.foto_url && m === 'zoom' ? ` data-zoom="${esc(w.foto_url)}"` : ''}>${w.foto_url
+  ? `<img src="${esc(w.foto_url)}" alt="" loading="lazy" decoding="async" onerror="this.remove()">` : bottSvg(w.tipologia)}</span>`;
+document.addEventListener('click', e => {
+  const t = e.target.closest('[data-zoom]'); if (!t) return;
+  e.preventDefault(); e.stopPropagation();
+  const m = document.createElement('div'); m.className = 'lightbox';
+  m.innerHTML = `<img src="${t.dataset.zoom}" alt="">`;
+  m.addEventListener('click', () => m.remove()); document.body.append(m);
+}, true);
 const chipTipo = (t, on) => `<button class="chip ${on ? 'on' : ''}" data-tipo="${t}" style="--tp:${tcol(t)}"><i class="dot"></i>${t}</button>`;
 const CSVCOLS = ['codice', 'produttore', 'nome', 'annata', 'tipologia', 'formato_cl', 'regione', 'nazione',
   'zona_produzione', 'esclusiva', 'vendibile_milano', 'disponibilita', 'prezzo_listino', 'no_sconto',
@@ -967,7 +977,7 @@ addRoute('catalogo', async () => {
     $('#lista').innerHTML = gruppiCat(list, w => {
       const s = ST[w.id] || {};
       return `<button class="row tp" data-w="${w.id}" style="--tp:${tcol(w.tipologia)}">
-        <span style="flex:1;min-width:0">
+        ${fotoVino(w)}<span style="flex:1;min-width:0">
           ${nomeVino(w)}
           <span class="sub">${esc([w.formato_cl ? w.formato_cl + ' cl' : null, w.zona_produzione].filter(Boolean).join(' · '))}</span>
           ${w.no_sconto || !w.vendibile_milano || w.gestione_giacenza ? `<span class="tags" style="margin-top:4px">
@@ -1050,6 +1060,7 @@ function schedaVino(w, s, done) {
   const admin = isAdmin();
   const m = modal(`<div class="bar"><h2 style="font-size:19px">${esc(w.nome)}</h2><span style="flex:1"></span>
       <button class="btn line sm" data-x>Chiudi</button></div>
+    ${fotoVino(w, 'big')}
     <div class="sub" style="margin:-8px 0 12px">${esc([w.produttore, w.annata, w.formato_cl ? w.formato_cl + ' cl' : null,
       w.zona_produzione, w.regione].filter(Boolean).join(' · '))}</div>
     <div class="inset">
@@ -1333,7 +1344,7 @@ addRoute('ordine', async (id, extra) => {
     const disp = w.gestione_giacenza ? `Libere ${s.disponibile ?? 0}` : lbl(w.disponibilita);
     const tono = w.gestione_giacenza && s.disponibile <= 12 ? 'var(--orange)' : 'var(--fg2)';
     return `<div class="row tp${fz(w) ? ' fz' : ''}" style="--tp:${tcol(w.tipologia)};${q ? 'background:var(--accent-tint)' : ''}">
-      <span style="flex:1;min-width:0">
+      ${fotoVino(w, 'zoom')}<span style="flex:1;min-width:0">
         ${fz(w) ? `<span class="stamp" title="${esc(w.esclusiva || '')}">Fuori zona</span>` : ''}
         ${nomeVino(w)}
         ${fz(w) && w.esclusiva ? `<span class="sub" style="display:block;color:var(--red)">${esc(w.esclusiva)}</span>` : ''}
