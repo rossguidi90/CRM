@@ -325,6 +325,10 @@ section.flash>.inset{animation:flash 1.3s ease}
 .offline-bar{position:fixed;top:0;left:0;right:0;z-index:90;padding:calc(6px + env(safe-area-inset-top)) 12px 6px;text-align:center;
   background:#9A4A00;color:#fff;font-size:13px;font-weight:600}
 .sub.refs{display:block;margin-top:2px;font-size:12.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.meter{height:10px;border-radius:999px;background:var(--fill);overflow:hidden;margin-top:10px}
+.meter i{display:block;height:100%;border-radius:999px;background:linear-gradient(90deg,#7A1F2B,#B0405A);animation:meterIn .9s cubic-bezier(.2,.8,.2,1) both;transform-origin:left}
+.meter.over i{background:linear-gradient(90deg,#9A4A00,#E08A2C)}
+@keyframes meterIn{from{transform:scaleX(0)}to{transform:none}}
 /* ---- selettore tema ---- */
 .theme-btn{display:inline-flex;align-items:center;gap:6px}
 #side .theme-btn{margin:0 10px;justify-content:flex-start;border-color:rgba(255,255,255,.18)!important;color:#D8D8D2!important}
@@ -394,8 +398,8 @@ if ('serviceWorker' in navigator) addEventListener('load', () => navigator.servi
 </script>
 <script src="crm_map.js?v=7"></script>
 <script src="crm_insights.js?v=5"></script>
-<script src="crm_client_form.js?v=8"></script>
-<script src="crm.js?v=20"></script>
+<script src="crm_client_form.js?v=9"></script>
+<script src="crm.js?v=21"></script>
 <script>
 // Diagnostica: se dopo 9 secondi l'app non è partita, dice cosa manca invece di girare a vuoto.
 (function () {

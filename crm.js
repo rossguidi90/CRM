@@ -55,7 +55,7 @@ const ICON = {
   cerca: 'M11 4a7 7 0 1 0 0 14 7 7 0 0 0 0-14M21 21l-5-5',
   chev: 'M9 6l6 6-6 6', piu: 'M12 5v14M5 12h14',
   tel: 'M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2',
-  chat: 'M4 5h16v11H9l-5 4z', matita: 'M4 20h4L19 9l-4-4L4 16zM14 6l4 4', scarica: 'M12 4v11M7 10l5 5 5-5M5 20h14', tema: 'M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z',
+  chat: 'M4 5h16v11H9l-5 4z', provvigioni: 'M17 6.5A6.5 6.5 0 1 0 17 17.5M4 10.5h9M4 13.5h9', matita: 'M4 20h4L19 9l-4-4L4 16zM14 6l4 4', scarica: 'M12 4v11M7 10l5 5 5-5M5 20h14', tema: 'M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z',
   cart: 'M3 4h2.5l2.3 11.2h10.4L21 8H6.6M9.5 20.2h.01M17.5 20.2h.01', cal: 'M4 6h16v14H4zM4 10h16M8 3v5M16 3v5', doc: 'M7 3h8l4 4v14H7zM15 3v4h4M10 13h6M10 17h4',
   rifai: 'M4 12a8 8 0 0 1 14-5.3L20 9M20 4v5h-5M20 12a8 8 0 0 1-14 5.3L4 15M4 20v-5h5', mail: 'M3 6h18v12H3zM3 7l9 6 9-6',
   pin: 'M12 21s-7-6.5-7-12a7 7 0 0 1 14 0c0 5.5-7 12-7 12zM12 11.5a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5',
@@ -97,7 +97,7 @@ async function boot() {
   if (!data) return renderLogin('Utente senza profilo agente. Contatta l\'amministratore.');
   if (!data.attivo) return renderLogin('Profilo non ancora attivato dall\'amministratore.');
   S.me = data;
-  const { data: ags } = await sb.from('agents').select('id, nome, colore, ruolo, attivo');
+  const { data: ags } = await sb.from('agents').select('id, nome, colore, ruolo, attivo, provvigioni, dettaglio_visibile_a');
   S.agents = Object.fromEntries((ags || []).map(a => [a.id, a]));
   window.addEventListener('hashchange', route);
   renderShell();
@@ -144,14 +144,15 @@ function renderLogin(msg) {
 /* ---------- shell ---------- */
 const NAV = [
   ['home', 'Home', '#/home'], ['clienti', 'Clienti', '#/clienti'], ['ordini', 'Ordini', '#/ordini'],
-  ['catalogo', 'Catalogo', '#/catalogo'], ['mappa', 'Mappa', '#/mappa'], ['analisi', 'Analisi', '#/analisi']
+  ['catalogo', 'Catalogo', '#/catalogo'], ['mappa', 'Mappa', '#/mappa'], ['analisi', 'Analisi', '#/analisi'],
+  ['provvigioni', 'Provvigioni', '#/provvigioni']
 ];
 function renderShell() {
   window.CRM_AVVIATO = true; hideSplash();
   $('#root').innerHTML = `<div id="app">
     <aside id="side">
       <div class="brand">${esc(CFG.nome)}</div>
-      <nav>${NAV.map(([k, l, h]) =>
+      <nav>${NAV.filter(n => n[0] !== 'provvigioni' || S.me.provvigioni).map(([k, l, h]) =>
         `<a href="${h}" data-nav="${k}">${svg(k, 18)}<span>${l}</span><span class="n" data-n="${k}"></span></a>`).join('')}</nav>
       ${temaBtn()}
       <div class="me">
@@ -162,7 +163,7 @@ function renderShell() {
       </div>
     </aside>
     <main id="main"></main>
-    <nav id="tabbar">${NAV.map(([k, l, h]) =>
+    <nav id="tabbar">${NAV.filter(n => n[0] !== 'provvigioni').map(([k, l, h]) =>
       `<a href="${h}" data-nav="${k}">${svg(k, 25)}<span>${l}</span></a>`).join('')}</nav>
   </div>`;
   document.addEventListener('click', e => { if (e.target.id === 'out2') $('#out').click(); });
@@ -263,6 +264,8 @@ addRoute('home', async () => {
       ${kpi('Clienti', String(S.clients.length), isAdmin() || isViewer() ? 'in rete' : `in rete · ${S.clients.filter(mine).length} tuoi`)}
       ${kpi('Da richiamare', String((recall || []).length), 'oltre il ritmo abituale', recall?.length ? 'orange' : '')}
     </div>
+    ${S.me.provvigioni ? `<a href="#/provvigioni" class="hide-desktop"><div class="inset" style="margin-top:12px"><div class="row">
+      ${svg('provvigioni', 20)}<span style="flex:1"><span class="ttl" style="font-size:15px">Le mie provvigioni</span></span>${svg('chev', 14, 'chev')}</div></div></a>` : ''}
     <div class="group"><h3>Promemoria · prossimi 7 giorni</h3><div class="inset" id="promList">
       ${(prom || []).map(r => rigaProm(r, true)).join('') || '<div class="empty">Niente in agenda. Aggiungi promemoria e appuntamenti dalla scheda cliente.</div>'}
     </div></div>
@@ -395,7 +398,7 @@ addRoute('cliente', async (id) => {
       <span style="flex:1;min-width:0">
         <h1 style="font-size:24px">${esc(c.insegna || c.ragione_sociale)}</h1>
         <span class="sub">${esc([lbl(c.tipologia), c.indirizzo, c.zona || c.citta].filter(Boolean).join(' · '))}</span><br>
-        <span style="display:inline-flex;gap:6px;margin-top:6px">${pill(c.stato)}
+        <span style="display:inline-flex;gap:6px;margin-top:6px;flex-wrap:wrap">${pill(c.stato)}${c.gruppo ? '<span class="pill" style="background:var(--gold-t);color:var(--gold)">Gruppo</span>' : ''}
           ${c.priorita ? `<span class="pill">Priorità ${esc(c.priorita)}</span>` : ''}
           <span class="pill"><i class="dot-ag" style="--ac:${ag?.colore || 'var(--fg3)'}"></i>${esc(ag?.nome || '—')}</span></span>
       </span>
@@ -1786,6 +1789,83 @@ async function scaricaBackup() {
   XLSX.writeFile(wb, `backup-wine-alchemist-${new Date().toLocaleDateString('sv-SE')}.xlsx`);
   toast('Backup scaricato');
 }
+
+/* ---------- Provvigioni ---------- */
+const PROV = { base: 10, alta: 12, gruppo: 5, soglia: 70000, campioni: 300, scontoCampioni: 25 };
+addRoute('provvigioni', async () => {
+  if (!S.me.provvigioni) { paint('<div class="empty">Pagina non disponibile per il tuo profilo.</div>'); return; }
+  await ensureClients();
+  const anno = S.provAnno || new Date().getFullYear();
+  const agenti = Object.values(S.agents).filter(a => a.provvigioni && (a.id === S.me.id || (a.dettaglio_visibile_a || []).includes(S.me.id)));
+  const agId = S.provAgente || S.me.id, ag = S.agents[agId] || S.me;
+  const da = new Date(anno - 1, 0, 1).toISOString(), a = new Date(anno + 1, 0, 1).toISOString();
+  const { data: ords, error } = await sb.from('orders')
+    .select('id, numero, client_id, stato, totale, imponibile, inviato_at, created_at, order_items(qty_omaggio, prezzo_unitario)')
+    .eq('agent_id', agId).in('stato', ['inviato', 'confermato', 'evaso']).gte('created_at', da).lt('created_at', a);
+  if (error) throw error;
+  const y = o => new Date(o.inviato_at || o.created_at).getFullYear();
+  const isGr = o => !!S.clients.find(c => c.id === o.client_id)?.gruppo;
+  const chiusi = o => o.stato === 'confermato' || o.stato === 'evaso';
+  const prec = (ords || []).filter(o => y(o) === anno - 1 && chiusi(o));
+  const fattPrec = prec.filter(o => !isGr(o)).reduce((s, o) => s + num(o.totale), 0);
+  const pct = fattPrec >= PROV.soglia ? PROV.alta : PROV.base;
+  const cur = (ords || []).filter(o => y(o) === anno).map(o => {
+    const gr = isGr(o), p = gr ? PROV.gruppo : pct;
+    return { ...o, gr, p, prov: Math.round(num(o.totale) * p) / 100 };
+  }).sort((x, z) => (z.inviato_at || z.created_at).localeCompare(x.inviato_at || x.created_at));
+  const ok = cur.filter(chiusi), att = cur.filter(o => o.stato === 'inviato');
+  const sum = (l, k) => l.reduce((s, o) => s + num(o[k]), 0);
+  const fattCat = sum(ok.filter(o => !o.gr), 'totale'), fattGr = sum(ok.filter(o => o.gr), 'totale');
+  const provOk = sum(ok, 'prov'), provAtt = sum(att, 'prov');
+  const campioni = ok.concat(att).reduce((s, o) => s + (o.order_items || []).reduce((t, i) => t + (i.qty_omaggio || 0) * num(i.prezzo_unitario), 0), 0);
+  const perc = v => Math.min(100, Math.round(v * 100));
+  const mesi = [...Array(12)].map((_, m) => { const l = ok.filter(o => new Date(o.inviato_at || o.created_at).getMonth() === m);
+    return { m, fatt: sum(l, 'totale'), prov: sum(l, 'prov') }; });
+  const maxP = Math.max(1, ...mesi.map(x => x.prov));
+  paint(`<div class="bar"><h1>Provvigioni</h1><span style="flex:1"></span>
+      <select id="pAnno" class="btn line sm" style="padding-right:26px">${[0, 1, 2].map(k => new Date().getFullYear() - k).map(v =>
+        `<option ${v === anno ? 'selected' : ''}>${v}</option>`).join('')}</select></div>
+    ${agenti.length > 1 ? `<div class="seg" style="margin-bottom:12px">${agenti.map(x =>
+      `<button data-pag="${x.id}" class="${x.id === agId ? 'on' : ''}">${esc(x.nome)}</button>`).join('')}</div>` : ''}
+    <div class="kpis">
+      ${kpi('Provvigioni maturate', eur(provOk), `${ok.length} ordini confermati o evasi`)}
+      ${kpi('In attesa di conferma', eur(provAtt), `${att.length} ordini inviati`, att.length ? 'orange' : '')}
+      ${kpi('Aliquota catalogo ' + anno, pct + '%', fattPrec >= PROV.soglia ? `${anno - 1} sopra i ${eur(PROV.soglia)}` : `${anno - 1}: ${eur(fattPrec)}`)}
+      ${kpi('Ristoranti del gruppo', PROV.gruppo + '%', `fatturato ${eur(fattGr)}`)}
+    </div>
+    <div class="group"><h3>Verso il ${PROV.alta}% nel ${anno + 1}</h3><div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:baseline;gap:10px;flex-wrap:wrap">
+        <span><b class="mono" style="font-size:20px">${eur(fattCat)}</b> <span class="sub">di ${eur(PROV.soglia)} · fatturato catalogo ${anno}</span></span>
+        <span class="sub">${fattCat >= PROV.soglia ? `✓ Soglia superata: nel ${anno + 1} provvigioni al ${PROV.alta}%` : `Mancano ${eur(PROV.soglia - fattCat)}`}</span></div>
+      <div class="meter"><i style="width:${perc(fattCat / PROV.soglia)}%"></i></div>
+      <div class="sub" style="margin-top:8px">Se il fatturato annuo supera ${eur(PROV.soglia)}, l'anno successivo la provvigione sul catalogo sale al ${PROV.alta}%; se scende sotto, torna al ${PROV.base}%. Gli ordini dei ristoranti del gruppo restano al ${PROV.gruppo}% e non contano per la soglia.</div>
+    </div></div>
+    <div class="group"><h3>Campionatura ${anno}</h3><div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:baseline;gap:10px;flex-wrap:wrap">
+        <span><b class="mono" style="font-size:20px">${eur(campioni)}</b> <span class="sub">usati di ${eur(PROV.campioni)}</span></span>
+        <span class="sub" style="${campioni > PROV.campioni ? 'color:var(--orange)' : ''}">${campioni > PROV.campioni
+          ? `Budget superato di ${eur(campioni - PROV.campioni)}: i campioni extra si acquistano con sconto ${PROV.scontoCampioni}%`
+          : `Restano ${eur(PROV.campioni - campioni)}`}</span></div>
+      <div class="meter ${campioni > PROV.campioni ? 'over' : ''}"><i style="width:${perc(campioni / PROV.campioni)}%"></i></div>
+      <div class="sub" style="margin-top:8px">Conta il valore a listino delle bottiglie segnate come "Omaggio" negli ordini.</div>
+    </div></div>
+    <div class="group"><h3>Andamento mensile</h3><div class="card">
+      <div class="spark" style="height:90px;gap:6px">${mesi.map(x => `<i class="${x.m === new Date().getMonth() && anno === new Date().getFullYear() ? 'cur' : ''}"
+        style="height:${Math.max(4, Math.round(x.prov / maxP * 100))}%" title="${new Date(anno, x.m).toLocaleDateString('it-IT', { month: 'long' })}: ${eur(x.prov)} su ${eur(x.fatt)}"></i>`).join('')}</div>
+      <div style="display:flex;gap:6px;margin-top:4px">${mesi.map(x => `<span class="sub" style="flex:1;text-align:center;font-size:10.5px">${new Date(anno, x.m).toLocaleDateString('it-IT', { month: 'narrow' })}</span>`).join('')}</div>
+    </div></div>
+    <div class="group"><h3>Dettaglio ordini ${anno}</h3><div class="inset">
+      ${cur.map(o => `<a href="#/ordine/${o.id}"><div class="row">
+        <span style="flex:1;min-width:0"><span class="ttl mono" style="font-size:15px">${esc(o.numero)}</span>
+          ${o.gr ? '<span class="pill" style="background:var(--gold-t);color:var(--gold);margin-left:6px">Gruppo</span>' : ''}<br>
+          <span class="sub">${esc(nomeCli(o.client_id))} · ${dmy(o.inviato_at || o.created_at)} · netto ${eur(o.totale)} × ${o.p}%</span></span>
+        <span class="mono" style="font-weight:700">${eur(o.prov)}</span>${pill(o.stato)}</div></a>`).join('')
+        || '<div class="empty">Nessun ordine inviato in questo anno.</div>'}
+    </div></div>
+    <div class="empty" style="padding:12px 4px">Calcolo sul netto dell'ordine: dopo sconti di riga, sconto cliente e sconto pagamento anticipato; IVA e trasporto esclusi. Le bottiglie in omaggio non generano provvigione.</div>`);
+  $('#pAnno').addEventListener('change', e => { S.provAnno = +e.target.value; route(); });
+  document.querySelectorAll('[data-pag]').forEach(b => b.addEventListener('click', () => { S.provAgente = b.dataset.pag; route(); }));
+}, 'provvigioni');
 
 /* ---------- avvio ---------- */
 function fatal(e, dettaglio) {

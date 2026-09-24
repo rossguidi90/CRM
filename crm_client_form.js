@@ -40,6 +40,7 @@ const CrmClientForm = (() => {
     ]},
     { id: 'commerciale', title: 'Commerciale', fields: [
       { k: 'stato', l: 'Stato', t: 'select', o: OPT.stato },
+      { k: 'gruppo', l: 'Ristorante del nostro gruppo (provvigione 5%)', t: 'bool' },
       { k: 'priorita', l: 'Priorità', t: 'select', o: OPT.priorita, empty: true },
       { k: 'potenziale_annuo', l: 'Potenziale annuo', t: 'money' },
       { k: 'fornitori_attuali', l: 'Fornitori / distributori attuali', t: 'textarea' },
