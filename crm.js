@@ -1855,7 +1855,7 @@ addRoute('provvigioni', async () => {
   const agId = S.provAgente || S.me.id, ag = S.agents[agId] || S.me;
   const da = new Date(anno - 1, 0, 1).toISOString(), a = new Date(anno + 1, 0, 1).toISOString();
   const { data: ords, error } = await sb.from('orders')
-    .select('id, numero, client_id, stato, totale, imponibile, inviato_at, created_at, order_items(qty_omaggio, prezzo_unitario)')
+    .select('id, numero, client_id, stato, totale, imponibile, inviato_at, created_at, omaggio_valore, order_items(qty_omaggio, prezzo_unitario)')
     .eq('agent_id', agId).in('stato', ['inviato', 'confermato', 'evaso']).gte('created_at', da).lt('created_at', a);
   if (error) throw error;
   const y = o => new Date(o.inviato_at || o.created_at).getFullYear();
@@ -1872,7 +1872,7 @@ addRoute('provvigioni', async () => {
   const sum = (l, k) => l.reduce((s, o) => s + num(o[k]), 0);
   const fattCat = sum(ok.filter(o => !o.gr), 'totale'), fattGr = sum(ok.filter(o => o.gr), 'totale');
   const provOk = sum(ok, 'prov'), provAtt = sum(att, 'prov');
-  const campioni = ok.concat(att).reduce((s, o) => s + (o.order_items || []).reduce((t, i) => t + (i.qty_omaggio || 0) * num(i.prezzo_unitario), 0), 0);
+  const campioni = ok.concat(att).reduce((s, o) => s + Math.max(0, (o.order_items || []).reduce((t, i) => t + (i.qty_omaggio || 0) * num(i.prezzo_unitario), 0) - num(o.omaggio_valore)), 0);
   const perc = v => Math.min(100, Math.round(v * 100));
   const mesi = [...Array(12)].map((_, m) => { const l = ok.filter(o => new Date(o.inviato_at || o.created_at).getMonth() === m);
     return { m, fatt: sum(l, 'totale'), prov: sum(l, 'prov') }; });
@@ -1902,7 +1902,7 @@ addRoute('provvigioni', async () => {
           ? `Budget superato di ${eur(campioni - PROV.campioni)}: i campioni extra si acquistano con sconto ${PROV.scontoCampioni}%`
           : `Restano ${eur(PROV.campioni - campioni)}`}</span></div>
       <div class="meter ${campioni > PROV.campioni ? 'over' : ''}"><i style="width:${perc(campioni / PROV.campioni)}%"></i></div>
-      <div class="sub" style="margin-top:8px">Conta il valore a listino delle bottiglie segnate come "Omaggio" negli ordini.</div>
+      <div class="sub" style="margin-top:8px">Conta il valore a listino delle bottiglie segnate come "Omaggio" negli ordini, escluse quelle della promo sconto merce.</div>
     </div></div>
     <div class="group"><h3>Andamento mensile</h3><div class="card">
       <div class="spark" style="height:90px;gap:6px">${mesi.map(x => `<i class="${x.m === new Date().getMonth() && anno === new Date().getFullYear() ? 'cur' : ''}"
