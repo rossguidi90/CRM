@@ -222,7 +222,7 @@ input.q:focus{outline:2px solid var(--accent);outline-offset:0}
   .filtri select:last-child:nth-child(3){grid-column:1/-1}
   .filtri.f2{grid-template-columns:1fr 1fr}
 }
-@media (min-width:720px){.filtri.f2{grid-template-columns:1fr}.filtri.f2 .tipo-sel{display:none}}
+@media (min-width:720px){.filtri.f2{grid-template-columns:1fr}.filtri.f2 .tipo-sel{display:none}.filtri.f3{grid-template-columns:minmax(0,2fr) minmax(0,1fr)}}
 .vit{display:block;font-size:13px;font-style:italic;color:var(--fg2);margin-bottom:1px}
 .h3act{display:flex;align-items:center;justify-content:space-between;gap:8px}
 .h3act .btn{text-transform:none;letter-spacing:0;min-height:30px;font-size:12.5px}
@@ -409,7 +409,7 @@ if ('serviceWorker' in navigator) addEventListener('load', () => navigator.servi
 <script src="crm_map.js?v=7"></script>
 <script src="crm_insights.js?v=5"></script>
 <script src="crm_client_form.js?v=9"></script>
-<script src="crm.js?v=27"></script>
+<script src="crm.js?v=28"></script>
 <script>
 // Diagnostica: se dopo 9 secondi l'app non è partita, dice cosa manca invece di girare a vuoto.
 (function () {

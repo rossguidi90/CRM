@@ -878,6 +878,15 @@ const ordinaCat = list => [...list].sort((a, b) =>
   (nazW(a) === 'Italia' ? 0 : 1) - (nazW(b) === 'Italia' ? 0 : 1) || nazW(a).localeCompare(nazW(b), 'it') ||
   (a.regione || '').localeCompare(b.regione || '', 'it') || (a.produttore || '').localeCompare(b.produttore || '', 'it') ||
   (a.nome || '').localeCompare(b.nome || '', 'it') || String(a.annata || '').localeCompare(String(b.annata || '')));
+const CAT_SORT = [['zona', 'Per zona'], ['az', 'Produttore A–Z'], ['pz_asc', 'Prezzo ↑'], ['pz_desc', 'Prezzo ↓']];
+const sortCat = (list, k) => {
+  const az = (a, b) => (a.produttore || '').localeCompare(b.produttore || '', 'it') || (a.nome || '').localeCompare(b.nome || '', 'it') ||
+    String(a.annata || '').localeCompare(String(b.annata || ''));
+  if (k === 'az') return [...list].sort(az);
+  const d = k === 'pz_desc' ? -1 : 1, pz = w => (w.prezzo_listino == null ? null : num(w.prezzo_listino));
+  return [...list].sort((a, b) => { const x = pz(a), y = pz(b);
+    return x === y ? az(a, b) : x == null ? 1 : y == null ? -1 : (x - y) * d; });
+};
 function gruppiCat(list, row) {
   const cnt = {}; list.forEach(w => { const k = nazW(w) + '|' + (w.regione || '—'); cnt[k] = (cnt[k] || 0) + 1; });
   let n0 = null, r0 = null;
@@ -1208,7 +1217,8 @@ addRoute('ordine', async (id, extra) => {
   const editabile = o.stato === 'bozza' && (isAdmin() || o.agent_id === S.me.id);
   const boss = isAdmin() || isViewer();
   const passo = () => 1; // singola bottiglia per click, sempre (nessun vincolo di cartone)
-  const f = { q: '', tipo: '', zona: '', primo: true, sconto: num(o.sconto_cliente_pct ?? cli.sconto_concordato_pct ?? 0) };
+  let sort0 = 'zona'; try { sort0 = localStorage.getItem('crm.catSort') || 'zona'; } catch {}
+  const f = { q: '', tipo: '', zona: '', sort: CAT_SORT.some(([k]) => k === sort0) ? sort0 : 'zona', primo: true, sconto: num(o.sconto_cliente_pct ?? cli.sconto_concordato_pct ?? 0) };
   const noSc = w => w.no_sconto || w.disponibilita === 'assegnazione';
   const netto = (w, it) => (it.qty - (it.qty_omaggio || 0)) * num(it.prezzo_unitario ?? w.prezzo_listino) * (1 - num(it.sconto_pct) / 100);
 
@@ -1462,11 +1472,12 @@ addRoute('ordine', async (id, extra) => {
             <input id="cq" type="search" placeholder="Produttore, vino, regione" value="${esc(f.q)}"></div>
           <div class="chips wide-only" style="margin:8px 0" id="tipi">
             ${TIPI.filter(t => t !== 'accessorio').map(t => chipTipo(t, f.tipo === t)).join('')}</div>
-          <div class="filtri f2"><select class="tipo-sel" id="tipoSel" aria-label="Tipologia"><option value="">Tutte le tipologie</option>
+          <div class="filtri f2 f3"><select class="tipo-sel" id="tipoSel" aria-label="Tipologia"><option value="">Tutte le tipologie</option>
       ${TIPI.filter(t => t !== 'accessorio').map(t => `<option value="${t}" ${f.tipo === t ? 'selected' : ''}>${t[0].toUpperCase() + t.slice(1)}</option>`).join('')}</select>
-            <select id="zona" class="zona" aria-label="Filtra per zona">${zoneOpts(catalogo, f.zona)}</select></div>
+            <select id="zona" class="zona" aria-label="Filtra per zona">${zoneOpts(catalogo, f.zona)}</select>
+            <select id="catSort" aria-label="Ordina">${CAT_SORT.map(([k, l]) => `<option value="${k}" ${f.sort === k ? 'selected' : ''}>${l}</option>`).join('')}</select></div>
           <div class="sub" style="padding:2px 4px 8px">${filtrati.length} referenze</div>
-          <div class="inset">${gruppiCat(filtrati, rigaVino) || '<div class="empty">Nessuna referenza.</div>'}</div>
+          <div class="inset">${(f.sort === 'zona' ? gruppiCat(filtrati, rigaVino) : sortCat(filtrati, f.sort).map(rigaVino).join('')) || '<div class="empty">Nessuna referenza.</div>'}</div>
         </div>` : `<div class="group" style="margin-top:0"><h3>Referenze</h3><div class="inset">
           ${gruppiCat(scelti, rigaVino) || '<div class="empty">Nessuna referenza.</div>'}
         </div></div>`}
@@ -1506,6 +1517,7 @@ addRoute('ordine', async (id, extra) => {
     const zs = $('#zona');
     if (zs) zs.addEventListener('change', e => { f.zona = e.target.value; render(); });
     $('#tipoSel')?.addEventListener('change', e => { f.tipo = e.target.value; render(); });
+    $('#catSort')?.addEventListener('change', e => { f.sort = e.target.value; try { localStorage.setItem('crm.catSort', f.sort); } catch {} render(); });
     $('#pag').addEventListener('change', e => go(async () => {
       const r = await sb.from('orders').update({ pagamento: e.target.value }).eq('id', o.id).select().single();
       if (r.error) throw r.error;
