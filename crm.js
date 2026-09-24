@@ -1484,7 +1484,7 @@ addRoute('ordine', async (id, extra) => {
       </div>
 
       <aside class="ord-cart">
-        <div class="group" style="margin-top:0"><h3>Carrello${bt ? ' · ' + bt + ' bottiglie' : ''}</h3><div class="inset">
+        <div class="group" style="margin-top:0"><h3>Carrello${bt ? ` · ${items.size} ${items.size === 1 ? 'referenza' : 'referenze'} · ${bt} ${bt === 1 ? 'bottiglia' : 'bottiglie'}` : ''}</h3><div class="inset">
           ${scelti.map(rigaCarrello).join('') || '<div class="cart-empty">Nessuna referenza selezionata.</div>'}
         </div></div>
         <div class="group"><h3>Riepilogo</h3><div class="inset">${riep}</div></div>
@@ -1500,7 +1500,7 @@ addRoute('ordine', async (id, extra) => {
 
     window.scrollTo(0, y0); const oc = $('.ord-cart'); if (oc) oc.scrollTop = cy0;
     f.lastBt = bt;
-    const cartHtml = () => `<div class="bar"><h2>Carrello${bt ? ' · ' + bt + ' bt' : ''}</h2><span style="flex:1"></span>
+    const cartHtml = () => `<div class="bar"><h2>Carrello${bt ? ` · ${items.size} ref. · ${bt} bt` : ''}</h2><span style="flex:1"></span>
         <button class="btn line sm" data-x>Chiudi</button></div>
       <div class="inset">${scelti.map(rigaCarrello).join('') || '<div class="cart-empty">Nessuna referenza selezionata.</div>'}</div>
       <div class="group"><h3>Riepilogo</h3><div class="inset">${riep}</div></div>`;
