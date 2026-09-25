@@ -235,6 +235,9 @@ input.q:focus{outline:2px solid var(--accent);outline-offset:0}
 .chk.on{background:var(--green);border-color:var(--green)}
 .chk.on::after{content:'';position:absolute;left:7px;top:3px;width:6px;height:11px;border:solid #fff;border-width:0 2px 2px 0;transform:rotate(45deg)}
 .prom.late .sub{color:var(--orange)}
+.feed.new .ttl::before{content:'';display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--blue);margin-right:7px;vertical-align:2px}
+.feed .pill{flex-shrink:0}
+.was{color:var(--fg3);font-weight:400}.promo{color:var(--green);font-weight:700;white-space:nowrap}
 .prom .ttl a{text-decoration:underline;text-decoration-color:var(--border);text-underline-offset:3px}
 .row.bye{animation:bye .26s ease forwards}
 @keyframes bye{to{opacity:0;transform:translateX(24px)}}
@@ -409,7 +412,7 @@ if ('serviceWorker' in navigator) addEventListener('load', () => navigator.servi
 <script src="crm_map.js?v=7"></script>
 <script src="crm_insights.js?v=5"></script>
 <script src="crm_client_form.js?v=9"></script>
-<script src="crm.js?v=31"></script>
+<script src="crm.js?v=33"></script>
 <script>
 // Diagnostica: se dopo 9 secondi l'app non è partita, dice cosa manca invece di girare a vuoto.
 (function () {
