@@ -1506,13 +1506,13 @@ addRoute('ordine', async (id, extra) => {
     const scontiTot = lordoTot - num(o.imponibile);
     const impLoc = scelti.reduce((a, w) => a + netto(w, items.get(w.id)), 0);
     const arrLoc = scelti.filter(arrivo).reduce((a, w) => a + netto(w, items.get(w.id)), 0);
-    const kvArr = arrLoc > 0 ? kv('Seconda spedizione (in arrivo)', `${eur(arrLoc)}${arrLoc < 400 ? ` · <b style="color:var(--red)">sotto il minimo di ${eur(400)}: l'ordine non si può inviare</b>` : ''}`) : '';
+    const kvArr = arrLoc > 0 ? kv('Seconda spedizione (in arrivo)', `${eur(arrLoc)}${arrLoc < 400 ? ` · <b style="color:var(--red)">sotto i ${eur(400)}: trasporto a carico del cliente</b>` : ''}`) : '';
     const riep = f.dirty ? `${kv('Imponibile (provvisorio)', eur(impLoc))}${kvArr}
           <div class="row"><label>Totale</label><span class="v sub">aggiornamento…</span></div>` : `          ${scontiTot > 0.004 ? kv('Totale listino', eur(lordoTot)) + kv('Sconti e omaggi', '− ' + eur(scontiTot)) : ''}
           ${kv('Imponibile', eur(o.imponibile))}${kvArr}
           ${o.sconto_pagamento ? kv('Sconto pagamento anticipato', '− ' + eur(o.sconto_pagamento)) : ''}
           ${o.omaggio_bt ? kv('Sconto merce', `${o.omaggio_bt} bt omaggio · ${esc(items.get(o.omaggio_wine_id)?.wine_label || '')}`) : ''}
-          ${kv('Trasporto', o.porto_franco ? 'Porto franco' : `Sotto i ${eur(400)}: trasporto a carico del cliente`)}
+          ${kv('Trasporto', o.porto_franco ? 'Porto franco' : arrLoc > 0 ? `Trasporto a carico del cliente (ogni spedizione deve superare ${eur(400)})` : `Sotto i ${eur(400)}: trasporto a carico del cliente`)}
           <div class="row"><label>Totale</label><span class="v mono" style="font-size:19px;font-weight:700;color:var(--fg)">${eur(o.totale)}</span></div>
 `;
     const azioni = [];
