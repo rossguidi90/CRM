@@ -1313,7 +1313,8 @@ addRoute('ordine', async (id, extra) => {
   const ST = Object.fromEntries((stock || []).map(s => [s.wine_id, s]));
   const fz = w => !w.vendibile_milano;
   const catalogo = ordinaCat((ws || []).filter(w => ST[w.id]?.vendibile ||
-    (fz(w) && w.prezzo_listino != null && !['esaurito', 'in_arrivo'].includes(w.disponibilita))));
+    (fz(w) && w.prezzo_listino != null && w.disponibilita !== 'esaurito')));
+  const arrivo = w => items.get(w.id)?.in_arrivo ?? w.disponibilita === 'in_arrivo';
   const items = new Map((rows || []).map(i => [i.wine_id, i]));
   let editabile = o.stato === 'bozza' && (isAdmin() || o.agent_id === S.me.id);
   const boss = isAdmin() || isViewer();
@@ -1456,6 +1457,7 @@ addRoute('ordine', async (id, extra) => {
     return `<div class="row tp${fz(w) ? ' fz' : ''}" style="--tp:${tcol(w.tipologia)};${q ? 'background:var(--accent-tint)' : ''}">
       ${fotoVino(w, 'zoom')}<span style="flex:1;min-width:0">
         ${fz(w) ? `<span class="stamp" title="${esc(w.esclusiva || '')}">Fuori zona</span>` : ''}
+        ${w.disponibilita === 'in_arrivo' ? '<span class="stamp arr" title="Spedita separatamente all\'arrivo">In arrivo</span>' : ''}
         ${nomeVino(w)}
         ${fz(w) && w.esclusiva ? `<span class="sub" style="display:block;color:var(--red)">${esc(w.esclusiva)}</span>` : ''}
         ${ultimo[w.id] ? (() => { const u = ultimo[w.id], net = num(u.prezzo_unitario) * (1 - num(u.sconto_pct) / 100),
@@ -1479,7 +1481,7 @@ addRoute('ordine', async (id, extra) => {
     return `<div class="cart-item tp${fz(w) ? ' fz' : ''}" style="--tp:${tcol(w.tipologia)}">
       <div class="cart-row">
         <span style="flex:1;min-width:0">
-          ${fz(w) ? '<span class="stamp sm">Fuori zona</span>' : ''}<span class="prod" style="font-size:11.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(w.produttore || '')}</span>
+          ${fz(w) ? '<span class="stamp sm">Fuori zona</span>' : ''}${arrivo(w) ? '<span class="stamp sm arr">In arrivo · sped. separata</span>' : ''}<span class="prod" style="font-size:11.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(w.produttore || '')}</span>
           <span class="ttl" style="font-size:14px;display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(w.nome)}${w.annata ? ' ' + esc(w.annata) : ''}</span>
           <span class="sub mono">${net < lordo - 0.004 ? `<s>${eur(lordo)}</s> ` : ''}<b>${eur(net)}</b>${info ? ` <span style="color:var(--green)">${info}</span>` : ''}</span></span>
         ${editabile ? `<span class="step">
@@ -1503,9 +1505,11 @@ addRoute('ordine', async (id, extra) => {
     const lordoTot = scelti.reduce((a, w) => { const it = items.get(w.id); return a + it.qty * num(it.prezzo_unitario ?? prezzoBase(w)); }, 0);
     const scontiTot = lordoTot - num(o.imponibile);
     const impLoc = scelti.reduce((a, w) => a + netto(w, items.get(w.id)), 0);
-    const riep = f.dirty ? `${kv('Imponibile (provvisorio)', eur(impLoc))}
+    const arrLoc = scelti.filter(arrivo).reduce((a, w) => a + netto(w, items.get(w.id)), 0);
+    const kvArr = arrLoc > 0 ? kv('Seconda spedizione (in arrivo)', `${eur(arrLoc)}${arrLoc < 400 ? ` · <b style="color:var(--red)">sotto il minimo di ${eur(400)}: l'ordine non si può inviare</b>` : ''}`) : '';
+    const riep = f.dirty ? `${kv('Imponibile (provvisorio)', eur(impLoc))}${kvArr}
           <div class="row"><label>Totale</label><span class="v sub">aggiornamento…</span></div>` : `          ${scontiTot > 0.004 ? kv('Totale listino', eur(lordoTot)) + kv('Sconti e omaggi', '− ' + eur(scontiTot)) : ''}
-          ${kv('Imponibile', eur(o.imponibile))}
+          ${kv('Imponibile', eur(o.imponibile))}${kvArr}
           ${o.sconto_pagamento ? kv('Sconto pagamento anticipato', '− ' + eur(o.sconto_pagamento)) : ''}
           ${o.omaggio_bt ? kv('Sconto merce', `${o.omaggio_bt} bt omaggio · ${esc(items.get(o.omaggio_wine_id)?.wine_label || '')}`) : ''}
           ${kv('Trasporto', o.porto_franco ? 'Porto franco' : `Sotto i ${eur(400)}: trasporto a carico del cliente`)}
@@ -1905,6 +1909,7 @@ function pdfOrdine(o, items, cli) {
     ${o.omaggio_bt ? `<div><span>Omaggio</span><span>${o.omaggio_bt} bt</span></div>` : ''}
     <div class="big"><span>Totale IVA esclusa</span><span>${eur(o.totale)}</span></div>
   </div>
+  ${items.some(i => i.in_arrivo) ? `<div class="note"><strong>Referenze in arrivo:</strong> le righe segnate [IN ARRIVO] vengono spedite separatamente appena disponibili (${eur(items.filter(i => i.in_arrivo).reduce((a, i) => a + (i.qty - (i.qty_omaggio || 0)) * num(i.prezzo_unitario) * (1 - num(i.sconto_pct) / 100), 0))}).</div>` : ''}
   ${o.note ? `<div class="note"><strong>Note:</strong> ${esc(o.note)}</div>` : ''}
   <footer>Documento generato dal CRM ${esc(CFG.nome)} · prezzi IVA esclusa</footer>
   <script>window.onload=()=>setTimeout(()=>window.print(),250)<\/script></body></html>`);
