@@ -40,10 +40,11 @@ const LBL = {
   bozza: 'Bozza', inviato: 'Inviato', confermato: 'Confermato', evaso: 'Evaso', annullato: 'Annullato',
   disponibile: 'Disponibile', limitato: 'Limitato', in_esaurimento: 'In esaurimento', in_arrivo: 'In arrivo',
   su_prenotazione: 'Su prenotazione', assegnazione: 'Assegnazione', esaurito: 'Esaurito',
-  anticipato: 'Anticipato (−4%)', bonifico_30: 'Bonifico 30 gg f.m.', riba_60: 'Ri.Ba. 60 gg f.m.',
+  anticipato: 'Anticipato (−4%)', bonifico_30: 'Bonifico 30 gg f.m.', riba_60: 'Ri.Ba. 60 gg f.m.', riba_90_fm: 'Ri.Ba. 90 gg f.m.',
   ristorante: 'Ristorante', enoteca: 'Enoteca', bar: 'Bar', hotel: 'Hotel', gastronomia: 'Gastronomia', altro: 'Altro'
 };
 const lbl = k => LBL[k] || k || '—';
+const isRiba = p => String(p || '').startsWith('riba_');
 const pill = k => `<span class="pill ${esc(k || '')}">${esc(lbl(k))}</span>`;
 const inPromo = w => num(w?.promo_pct) > 0;
 const prezzoBase = w => w.prezzo_listino == null ? null
@@ -1561,10 +1562,10 @@ addRoute('ordine', async (id, extra) => {
             : pren ? kv('Tipo', 'Prenotazione') : ''}
           <div class="row"><label for="pag">Pagamento</label>
             <select id="pag" ${editabile ? '' : 'disabled'}>
-              ${['anticipato', 'bonifico_30', 'riba_60'].map(p =>
+              ${['anticipato', 'bonifico_30', 'riba_60', 'riba_90_fm'].map(p =>
                 `<option value="${p}" ${o.pagamento === p ? 'selected' : ''}>${lbl(p)}</option>`).join('')}
             </select></div>
-          ${o.pagamento === 'riba_60' ? `<div class="row"><label for="oIban">IBAN cliente${o.iban && !ibanOk(o.iban) ? '<br><span class="sub" style="color:var(--red)">IBAN non valido</span>' : !o.iban ? '<br><span class="sub" style="color:var(--orange)">Obbligatorio per Ri.Ba.</span>' : ''}</label>
+          ${isRiba(o.pagamento) ? `<div class="row"><label for="oIban">IBAN cliente${o.iban && !ibanOk(o.iban) ? '<br><span class="sub" style="color:var(--red)">IBAN non valido</span>' : !o.iban ? '<br><span class="sub" style="color:var(--orange)">Obbligatorio per Ri.Ba.</span>' : ''}</label>
             <input id="oIban" type="text" class="mono" autocomplete="off" autocapitalize="characters" spellcheck="false" maxlength="42"
               placeholder="IT00 X000 0000 0000 0000 0000 000" value="${esc(ibanFmt(o.iban))}" ${editabile ? '' : 'disabled'} style="flex:1;min-width:0;max-width:320px;margin-left:auto;text-transform:uppercase"></div>` : ''}
           <div class="row"><label for="scontoCli">Sconto cliente</label>
@@ -1746,7 +1747,7 @@ addRoute('ordine', async (id, extra) => {
     }));
     document.querySelectorAll('[data-go]').forEach(b => b.addEventListener('click', () => go(async () => {
       if (pend.size || flushing) { clearTimeout(flushT); await flush(); }
-      if (b.dataset.go === 'inviato' && o.pagamento === 'riba_60' && !ibanOk(o.iban)) {
+      if (b.dataset.go === 'inviato' && isRiba(o.pagamento) && !ibanOk(o.iban)) {
         toast('Pagamento Ri.Ba.: inserisci un IBAN valido prima di inviare', 4000); $('#oIban')?.focus(); return; }
       const fuori = scelti.filter(fz);
       if (b.dataset.go === 'inviato' && fuori.length &&
@@ -1845,7 +1846,7 @@ function testoOrdine(o, items, cli) {
     `Totale (iva escl.): ${eur(o.totale)}`,
     o.porto_franco ? 'Porto franco' : 'Trasporto a carico del cliente',
     `Pagamento: ${lbl(o.pagamento)}`,
-    o.pagamento === 'riba_60' && o.iban ? `IBAN: ${ibanFmt(o.iban)}` : '',
+    isRiba(o.pagamento) && o.iban ? `IBAN: ${ibanFmt(o.iban)}` : '',
     o.data_consegna ? `Consegna richiesta: ${dmy(o.data_consegna)}` : '',
     o.note ? `Note: ${o.note}` : '',
     '—',
@@ -1891,7 +1892,7 @@ function pdfOrdine(o, items, cli) {
       ${D.finestra_consegna ? `<br>Orari consegna: ${esc(D.finestra_consegna)}` : ''}
       ${D.note_consegna ? `<br><span class="muted">${esc(D.note_consegna)}</span>` : ''}</div>
     <div class="box"><h3>Condizioni</h3>Pagamento: ${esc(lbl(o.pagamento))}
-      ${o.pagamento === 'riba_60' && o.iban ? `<br>IBAN: <span class="mono">${esc(ibanFmt(o.iban))}</span>` : ''}
+      ${isRiba(o.pagamento) && o.iban ? `<br>IBAN: <span class="mono">${esc(ibanFmt(o.iban))}</span>` : ''}
       ${o.data_consegna ? `<br>Consegna richiesta: ${dmy(o.data_consegna)}` : ''}
       <br>${o.porto_franco ? 'Porto franco' : 'Trasporto a carico del cliente'}
       ${ag ? `<br>Agente: ${esc(ag.nome)}` : ''}</div>
