@@ -674,7 +674,7 @@ function editCliente(c, contatti = [], sezione) {
       const box = document.createElement('div');
       box.className = 'venue-sugg';
       box.innerHTML = cand.map((x, i) => `<button type="button" class="row" data-cand="${i}"><span style="flex:1;min-width:0;text-align:left">
-          <span class="ttl">${esc(x.insegna)}</span><br><span class="sub">${esc([x.indirizzo, x.zona, x.citta].filter(Boolean).join(' · '))}</span></span>
+          <span class="ttl">${esc(x.insegna)}</span><br><span class="sub">${esc([x.indirizzo, x.zona, x.citta].filter((v, i, a) => v && a.indexOf(v) === i).join(' · '))}</span></span>
           ${svg('chev', 14, 'chev')}</button>`).join('');
       inp.closest('.row').after(box);
       box.onclick = e => go(async () => {

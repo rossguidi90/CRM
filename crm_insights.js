@@ -17,19 +17,23 @@ const CrmInsights = (() => {
 
   // Autocomplete nome locale: Photon (OSM, veloce, CORS) + dettagli da Nominatim alla scelta
   const PHOTON = 'https://photon.komoot.io/api/';
+  const AREA = '8.49,44.68,11.43,46.64';   // Lombardia e dintorni (Brianza, laghi, Novara, Piacenza); priorità a Milano
   const NOMI = 'https://nominatim.openstreetmap.org/lookup';
   const LOCALI = /^(amenity:(restaurant|bar|pub|cafe|wine_bar|fast_food|biergarten|ice_cream)|shop:(wine|alcohol|deli|pasta|bakery|pastry)|tourism:(hotel|guest_house))$/;
   const cap = v => (v && !/^\d{3}00$/.test(v) ? v : null);   // 20100 = CAP generico: meglio vuoto
-  const zonaDi = a => a.quarter || a.neighbourhood || a.locality ||
-    (/^Municipio/.test(a.suburb || a.district || '') ? null : a.suburb) || a.suburb || a.district ||
-    ((a.city || a.town || a.village) && !/^Mil(ano|an)$/.test(a.city) ? a.city || a.town || a.village : null);
+  // Zona: a Milano il quartiere, fuori Milano il comune
+  const zonaDi = a => {
+    const comune = a.city || a.town || a.village || a.municipality;
+    if (comune && !/^Mil(ano|an)$/.test(comune)) return comune;
+    return a.quarter || a.neighbourhood || a.locality || a.suburb || a.district || null;
+  };
   let ctrl;
   async function searchVenue(name, limit = 6) {
     const q = name.trim();
     if (q.length < 3) return [];
     ctrl?.abort();
     ctrl = new AbortController();
-    const res = await fetch(`${PHOTON}?q=${encodeURIComponent(q)}&lat=45.4642&lon=9.19&limit=15&lang=default&bbox=8.95,45.33,9.40,45.60`,
+    const res = await fetch(`${PHOTON}?q=${encodeURIComponent(q)}&lat=45.4642&lon=9.19&limit=25&lang=default&location_bias_scale=0.3&bbox=${AREA}`,
       { signal: ctrl.signal });
     if (!res.ok) throw new Error(`Ricerca locali HTTP ${res.status}`);
     const { features = [] } = await res.json();
@@ -61,7 +65,7 @@ const CrmInsights = (() => {
         indirizzo: via || cand.indirizzo,
         cap: cap(a.postcode) || cand.cap,
         citta: a.city || a.town || a.village || cand.citta,
-        zona: a.quarter || a.neighbourhood || cand.zona || zonaDi(a),
+        zona: (/^Mil(ano|an)$/.test(a.city || '') ? a.quarter || a.neighbourhood || cand.zona : null) || zonaDi(a) || cand.zona,
         ragione_sociale: t.operator || null,
         cucina: cucina || null,
         orari: t.opening_hours ?? null,
