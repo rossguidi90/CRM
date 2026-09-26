@@ -74,11 +74,12 @@ const CrmInsights = (() => {
   }
 
   // Merge nel form: non sovrascrive campi già compilati dall'agente
-  // (l'insegna scelta sostituisce il testo parziale digitato)
+  // (insegna, tipologia e città del locale scelto sostituiscono testo parziale e valori predefiniti)
   const applyCandidate = (form, cand) => {
     const { osm_ref, ...c } = cand;
+    const forza = Object.fromEntries(['insegna', 'tipologia', 'citta'].filter(k => c[k] && c[k] !== 'altro').map(k => [k, c[k]]));
     return { ...Object.fromEntries(Object.entries({ ...c, ...Object.fromEntries(
-      Object.entries(form).filter(([, v]) => v !== null && v !== '' && v !== undefined)) })), insegna: c.insegna };
+      Object.entries(form).filter(([, v]) => v !== null && v !== '' && v !== undefined)) })), ...forza };
   };
 
   // ---------- RPC ----------
