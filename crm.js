@@ -2078,10 +2078,6 @@ addRoute('provvigioni', async () => {
     .sort((x, z) => dOrd(z.o).localeCompare(dOrd(x.o)));
   const campioni = campOrd.reduce((s, o) => s + (o.order_items || []).reduce((t, i) => t + i.qty * num(i.prezzo_unitario), 0), 0)
     + cur.reduce((s, o) => s + Math.max(0, (o.order_items || []).reduce((t, i) => t + (i.qty_omaggio || 0) * num(i.prezzo_unitario), 0) - num(o.omaggio_valore)), 0);
-  const refs = [...cur.reduce((m, o) => { (o.order_items || []).forEach(i => {
-      const r = m.get(i.wine_id) || { label: i.wine_label, bt: 0, n: 0, last: '', clienti: new Set() };
-      r.bt += i.qty; r.n++; r.clienti.add(o.client_id); if (dOrd(o) > r.last) r.last = dOrd(o); m.set(i.wine_id, r); }); return m; }, new Map()).values()]
-    .sort((x, z) => z.bt - x.bt || z.last.localeCompare(x.last));
   const perc = v => Math.min(100, Math.round(v * 100));
   const budget = PROV.campioni * sel.length;
   const mesi = [...Array(12)].map((_, m) => { const l = ok.filter(o => new Date(o.inviato_at || o.created_at).getMonth() === m);
@@ -2123,11 +2119,6 @@ addRoute('provvigioni', async () => {
       <div class="spark" style="height:90px;gap:6px">${mesi.map(x => `<i class="${x.m === new Date().getMonth() && anno === new Date().getFullYear() ? 'cur' : ''}"
         style="height:${Math.max(4, Math.round(x.prov / maxP * 100))}%" title="${new Date(anno, x.m).toLocaleDateString('it-IT', { month: 'long' })}: ${eur(x.prov)} su ${eur(x.fatt)}"></i>`).join('')}</div>
       <div style="display:flex;gap:6px;margin-top:4px">${mesi.map(x => `<span class="sub" style="flex:1;text-align:center;font-size:10.5px">${new Date(anno, x.m).toLocaleDateString('it-IT', { month: 'narrow' })}</span>`).join('')}</div>
-    </div></div>
-    <div class="group"><h3>Referenze ordinate ${anno}</h3><div class="inset">
-      ${refs.map(r => `<div class="row"><span style="flex:1;min-width:0"><span class="ttl" style="font-size:14px">${esc(r.label || '')}</span><br>
-        <span class="sub">${r.n} ${r.n === 1 ? 'ordine' : 'ordini'} · ${r.clienti.size} ${r.clienti.size === 1 ? 'cliente' : 'clienti'} · ultimo ${dmy(r.last)}</span></span>
-        <span class="mono" style="font-weight:700">${r.bt} bt</span></div>`).join('') || '<div class="empty">Nessuna referenza ordinata.</div>'}
     </div></div>
     <div class="group"><h3>Dettaglio ordini ${anno}</h3><div class="inset">
       ${cur.map(o => `<a href="#/ordine/${o.id}"><div class="row">
