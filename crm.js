@@ -2050,7 +2050,7 @@ addRoute('provvigioni', async () => {
   const chi = sel.map(i => S.agents[i]?.nome || '').filter(Boolean).join(' e ');
   const da = new Date(anno - 1, 0, 1).toISOString(), a = new Date(anno + 1, 0, 1).toISOString();
   const { data: ords, error } = await sb.from('orders')
-    .select('id, numero, client_id, agent_id, tipo, stato, pagamento, pagato_at, totale, imponibile, inviato_at, created_at, omaggio_valore, order_items(wine_id, wine_label, qty, qty_omaggio, prezzo_unitario)')
+    .select('id, numero, client_id, agent_id, tipo, stato, pagamento, pagato_at, provvigione_pagata_at, totale, imponibile, inviato_at, created_at, omaggio_valore, order_items(wine_id, wine_label, qty, qty_omaggio, prezzo_unitario)')
     .in('agent_id', sel).in('stato', ['inviato', 'confermato', 'evaso']).gte('created_at', da).lt('created_at', a);
   if (error) throw error;
   const y = o => new Date(o.inviato_at || o.created_at).getFullYear();
@@ -2072,6 +2072,10 @@ addRoute('provvigioni', async () => {
   const sum = (l, k) => l.reduce((s, o) => s + num(o[k]), 0);
   const fattCat = sum(conf.filter(o => !o.gr), 'totale'), fattGr = sum(conf.filter(o => o.gr), 'totale');
   const provOk = sum(ok, 'prov'), provAtt = sum(att, 'prov');
+  const liq = ok.filter(o => o.provvigione_pagata_at), daLiq = ok.filter(o => !o.provvigione_pagata_at);
+  const canLiq = isAdmin() || isViewer();
+  const statoProv = o => !maturata(o) ? (chiusi(o) ? ['Da incassare', 'orange'] : null)
+    : o.provvigione_pagata_at ? ['Ricevuta ' + dmy(o.provvigione_pagata_at), 'green'] : ['Da ricevere', 'blue'];
   const dOrd = o => o.inviato_at || o.created_at;
   const campRighe = campOrd.flatMap(o => (o.order_items || []).map(i => ({ o, i, v: i.qty * num(i.prezzo_unitario) })))
     .concat(cur.flatMap(o => (o.order_items || []).filter(i => i.qty_omaggio).map(i => ({ o, i: { ...i, qty: i.qty_omaggio }, v: 0, om: true }))))
@@ -2089,10 +2093,10 @@ addRoute('provvigioni', async () => {
     ${agenti.length > 1 ? `<div class="seg" style="margin-bottom:12px"><button data-pag="tutti" class="${insieme ? 'on' : ''}">Insieme</button>${ids.map(i =>
       `<button data-pag="${i}" class="${!insieme && i === agId ? 'on' : ''}">${esc(S.agents[i].nome)}</button>`).join('')}</div>` : ''}
     <div class="kpis">
-      ${kpi('Provvigioni confermate', eur(provOk), `${ok.length} ordini pagati`)}
+      ${kpi('Ricevute', eur(sum(liq, 'prov')), `${liq.length} ordini · liquidate da ${CFG.nome}`, liq.length ? 'green' : '')}
+      ${kpi('Da ricevere', eur(sum(daLiq, 'prov')), `${daLiq.length} ordini pagati dal cliente`, daLiq.length ? 'blue' : '')}
       ${kpi('In attesa', eur(provAtt), [daIncassare ? `${daIncassare} da incassare` : '', daConfermare ? `${daConfermare} da confermare` : ''].filter(Boolean).join(' · ') || 'nessun ordine', att.length ? 'orange' : '')}
       ${kpi('Aliquota catalogo ' + anno, pct + '%', `${anno - 1} insieme: ${eur(fattPrec)}`)}
-      ${kpi('Ristoranti del gruppo', PROV.gruppo + '%', `fatturato ${eur(fattGr)}`)}
     </div>
     <div class="group"><h3>Verso il ${PROV.alta}% nel ${anno + 1}</h3><div class="card">
       <div style="display:flex;justify-content:space-between;align-items:baseline;gap:10px;flex-wrap:wrap">
@@ -2120,17 +2124,28 @@ addRoute('provvigioni', async () => {
         style="height:${Math.max(4, Math.round(x.prov / maxP * 100))}%" title="${new Date(anno, x.m).toLocaleDateString('it-IT', { month: 'long' })}: ${eur(x.prov)} su ${eur(x.fatt)}"></i>`).join('')}</div>
       <div style="display:flex;gap:6px;margin-top:4px">${mesi.map(x => `<span class="sub" style="flex:1;text-align:center;font-size:10.5px">${new Date(anno, x.m).toLocaleDateString('it-IT', { month: 'narrow' })}</span>`).join('')}</div>
     </div></div>
-    <div class="group"><h3>Dettaglio ordini ${anno}</h3><div class="inset">
+    <div class="group"><h3 style="display:flex;align-items:center;gap:8px">Dettaglio ordini ${anno}<span style="flex:1"></span>
+      ${canLiq && daLiq.length ? `<button class="btn line sm" id="liqTutte" style="text-transform:none;letter-spacing:0">Segna ricevute tutte (${daLiq.length} · ${eur(sum(daLiq, 'prov'))})</button>` : ''}</h3><div class="inset">
       ${cur.map(o => `<a href="#/ordine/${o.id}"><div class="row">
         <span style="flex:1;min-width:0"><span class="ttl mono" style="font-size:15px">${esc(o.numero)}</span>
           ${o.gr ? '<span class="pill" style="background:var(--gold-t);color:var(--gold);margin-left:6px">Gruppo</span>' : ''}${insieme ? `<span class="pill" style="margin-left:6px">${esc(S.agents[o.agent_id]?.nome || '')}</span>` : ''}<br>
           <span class="sub">${esc(nomeCli(o.client_id))} · ${dmy(o.inviato_at || o.created_at)} · netto ${eur(o.totale)} × ${o.p}%</span></span>
-        <span class="mono" style="font-weight:700${maturata(o) ? '' : ';color:var(--fg2)'}">${eur(o.prov)}</span>${chiusi(o) && !maturata(o) ? '<span class="pill" style="background:var(--orange-t);color:var(--orange)">Da incassare</span>' : pill(o.stato)}</div></a>`).join('')
+        <span class="mono" style="font-weight:700${maturata(o) ? '' : ';color:var(--fg2)'}">${eur(o.prov)}</span>${(sp => sp ? `<span class="pill" style="background:var(--${sp[1]}-t);color:var(--${sp[1]})">${sp[0]}</span>` : pill(o.stato))(statoProv(o))}
+        ${canLiq && maturata(o) ? `<button class="btn line sm" data-liq="${o.id}" data-v="${o.provvigione_pagata_at ? 0 : 1}" title="${o.provvigione_pagata_at ? 'Annulla: provvigione non ancora ricevuta' : 'Segna provvigione ricevuta'}">${o.provvigione_pagata_at ? '↺' : '✓'}</button>` : ''}</div></a>`).join('')
         || '<div class="empty">Nessun ordine inviato in questo anno.</div>'}
     </div></div>
-    <div class="empty" style="padding:12px 4px">La provvigione è confermata quando l'ordine è pagato: subito per il pagamento anticipato, per Bonifico e Ri.Ba. quando l'ordine viene segnato «pagato». Calcolo sul netto dell'ordine: dopo sconti di riga, sconto cliente e sconto pagamento anticipato; IVA e trasporto esclusi. Le bottiglie in omaggio non generano provvigione.</div>`);
+    <div class="empty" style="padding:12px 4px">«Ricevuta» indica che ${esc(CFG.nome)} ha liquidato la provvigione. La provvigione spetta quando l'ordine è pagato dal cliente: subito per il pagamento anticipato, per Bonifico e Ri.Ba. quando l'ordine viene segnato «pagato». Calcolo sul netto dell'ordine: dopo sconti di riga, sconto cliente e sconto pagamento anticipato; IVA e trasporto esclusi. Le bottiglie in omaggio non generano provvigione.</div>`);
   $('#pAnno').addEventListener('change', e => { S.provAnno = +e.target.value; route(); });
   document.querySelectorAll('[data-pag]').forEach(b => b.addEventListener('click', () => { S.provAgente = b.dataset.pag; route(); }));
+  const liquida = (idsOrd, v) => go(async () => {
+    const r = await sb.rpc('segna_provvigione_pagata', { p_orders: idsOrd, p_pagata: v });
+    if (r.error) throw r.error;
+    toast(v ? `${r.data} provvigion${r.data === 1 ? 'e segnata ricevuta' : 'i segnate ricevute'}` : 'Provvigione di nuovo da ricevere'); route();
+  });
+  document.querySelectorAll('[data-liq]').forEach(b => b.addEventListener('click', e => {
+    e.preventDefault(); e.stopPropagation(); liquida([b.dataset.liq], b.dataset.v === '1'); }));
+  $('#liqTutte')?.addEventListener('click', () => {
+    if (confirm(`Segnare come ricevute ${daLiq.length} provvigioni per ${eur(sum(daLiq, 'prov'))}?`)) liquida(daLiq.map(o => o.id), true); });
 }, 'provvigioni');
 
 /* ---------- avvio ---------- */
