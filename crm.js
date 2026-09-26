@@ -51,7 +51,7 @@ const prezzoBase = w => w.prezzo_listino == null ? null
   : inPromo(w) ? Math.round(num(w.prezzo_listino) * (100 - num(w.promo_pct))) / 100 : num(w.prezzo_listino);
 const prezzoHtml = w => inPromo(w)
   ? `<s class="was">${eur(w.prezzo_listino)}</s> <span class="promo">Prezzo promo ${eur(prezzoBase(w))}</span>` : eur(w.prezzo_listino);
-const tipoDoc = o => o?.tipo === 'prenotazione' ? 'Prenotazione' : 'Ordine';
+const tipoDoc = o => o?.tipo === 'prenotazione' ? 'Prenotazione' : o?.tipo === 'campionatura' ? 'Campionatura' : 'Ordine';
 const ICON = {
   home: 'M3 11l9-7 9 7v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z',
   clienti: 'M4 9l1.5-5h13L20 9M4 9h16v11H4zM10 20v-5h4v5',
@@ -1255,7 +1255,7 @@ addRoute('ordini', async () => {
       (!f.q || (o.numero + ' ' + nomeCli(o.client_id)).toLowerCase().includes(f.q.toLowerCase())));
     $('#lista').innerHTML = list.map(o => `<a href="#/ordine/${o.id}"><div class="row">
       <span style="flex:1;min-width:0"><span class="ttl mono">${esc(o.numero)}</span><br>
-        <span class="sub">${o.tipo === 'prenotazione' ? 'Prenotazione · ' : ''}${esc(nomeCli(o.client_id))} · ${dmy(o.inviato_at || o.created_at)}${S.agents[o.agent_id] ? ' · ' + esc(S.agents[o.agent_id].nome) : ''}
+        <span class="sub">${o.tipo && o.tipo !== 'ordine' ? tipoDoc(o) + ' · ' : ''}${esc(nomeCli(o.client_id))} · ${dmy(o.inviato_at || o.created_at)}${S.agents[o.agent_id] ? ' · ' + esc(S.agents[o.agent_id].nome) : ''}
         ${o.scade_at && o.stato === 'inviato' ? ' · scade ' + dmy(o.scade_at) : ''}</span></span>
       ${o.dettaglio ? `<span class="mono">${eur(o.totale)}</span>` : `<span class="sub">${o.n_referenze} ref.</span><span class="pill" title="Dettaglio riservato all'agente">🔒 riservato</span>`}${pill(o.stato)}${svg('chev', 14, 'chev')}</div></a>`).join('')
       || '<div class="empty">Nessun ordine.</div>';
@@ -1316,7 +1316,6 @@ addRoute('ordine', async (id, extra) => {
   const items = new Map((rows || []).map(i => [i.wine_id, i]));
   let editabile = o.stato === 'bozza' && (isAdmin() || o.agent_id === S.me.id);
   const boss = isAdmin() || isViewer();
-  const passo = () => 1; // singola bottiglia per click, sempre (nessun vincolo di cartone)
   let sort0 = 'zona'; try { sort0 = localStorage.getItem('crm.catSort') || 'zona'; } catch {}
   const f = { q: '', tipo: '', zona: '', sort: CAT_SORT.some(([k]) => k === sort0) ? sort0 : 'zona', primo: true, sconto: num(o.sconto_cliente_pct ?? cli.sconto_concordato_pct ?? 0) };
   const noSc = w => w.no_sconto || w.disponibilita === 'assegnazione';
@@ -1466,9 +1465,7 @@ addRoute('ordine', async (id, extra) => {
           <span style="color:${tono}">· ${esc(disp)}</span>
           ${!inPromo(w) && (w.no_sconto || w.disponibilita === 'assegnazione') ? '· no sconto' : ''}</span></span>
       ${editabile ? `<span class="step">
-        <button data-dec="${w.id}" aria-label="Togli" ${q ? '' : 'disabled'}>−</button>
-        <input class="q" data-qty="${w.id}" type="number" min="0" step="1" inputmode="numeric" value="${q}" aria-label="Quantità">
-        <button data-inc="${w.id}" aria-label="Aggiungi">+</button></span>`
+        <input class="q" data-qty="${w.id}" type="number" min="0" step="1" inputmode="numeric" value="${q}" aria-label="Quantità"></span>`
         : `<span class="mono">${q} bt</span>`}
     </div>`;
   };
@@ -1485,9 +1482,7 @@ addRoute('ordine', async (id, extra) => {
           <span class="ttl" style="font-size:14px;display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(w.nome)}${w.annata ? ' ' + esc(w.annata) : ''}</span>
           <span class="sub mono">${net < lordo - 0.004 ? `<s>${eur(lordo)}</s> ` : ''}<b>${eur(net)}</b>${info ? ` <span style="color:var(--green)">${info}</span>` : ''}</span></span>
         ${editabile ? `<span class="step">
-          <button data-dec="${w.id}" aria-label="Togli">−</button>
-          <input class="q" data-qty="${w.id}" type="number" min="0" step="1" inputmode="numeric" value="${q}" aria-label="Quantità">
-          <button data-inc="${w.id}" aria-label="Aggiungi">+</button></span>`
+          <input class="q" data-qty="${w.id}" type="number" min="0" step="1" inputmode="numeric" value="${q}" aria-label="Quantità"></span>`
           : `<span class="mono">${q} bt</span>`}
       </div>
       ${editabile ? `<div class="cart-opts">
@@ -1536,7 +1531,7 @@ addRoute('ordine', async (id, extra) => {
           <button class="btn line sm" id="mailOrd" aria-label="Email">${svg('mail', 16)}<span class="hide-m">&nbsp;Email</span></button>
           <button class="btn line sm" id="waOrd" aria-label="WhatsApp">${svg('chat', 16)}<span class="hide-m">&nbsp;WhatsApp</span></button></div>
         <h1 class="mono" style="font-size:22px;display:flex;align-items:center;gap:10px;flex-wrap:wrap">${esc(o.numero)} ${pill(o.stato)}
-          ${pren ? '<span class="pill trattativa" style="font-family:var(--font)">Prenotazione</span>' : ''}
+          ${o.tipo && o.tipo !== 'ordine' ? `<span class="pill trattativa" style="font-family:var(--font)">${tipoDoc(o)}</span>` : ''}
           ${o.email_inviata_at ? `<span class="pill attivo" style="font-family:var(--font)">✓ email inviata ${dmy(o.email_inviata_at)}</span>` : ''}
           ${o.stato !== 'bozza' && !o.email_inviata_at && (isAdmin() || o.agent_id === S.me.id) ? '<button class="btn line sm" id="reMail" style="font-family:var(--font)">Invia email ora</button>' : ''}</h1>
         ${f.mod ? `<div class="inset" style="margin-top:10px;padding:10px 12px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;border:1px solid var(--orange)">
@@ -1548,6 +1543,9 @@ addRoute('ordine', async (id, extra) => {
         : isAdmin() && o.stato === 'inviato' ? `<div class="inset" style="margin-top:10px;padding:10px 12px;display:flex;align-items:center;gap:10px;flex-wrap:wrap">
           <span style="flex:1;min-width:200px"><b>In attesa di conferma</b><br><span class="sub">Quando è approvato, segnalo qui: entra nel fatturato del mese.</span></span>
           <button class="btn sm" data-go="confermato">Segna confermato</button></div>` : ''}
+        ${['confermato', 'evaso'].includes(o.stato) && o.pagamento !== 'anticipato' && o.tipo !== 'campionatura' ? `<div class="inset" style="margin-top:10px;padding:10px 12px;display:flex;align-items:center;gap:10px;flex-wrap:wrap${o.pagato_at ? '' : ';border:1px solid var(--orange)'}">
+          <span style="flex:1;min-width:200px"><b>${o.pagato_at ? '✓ Pagato il ' + dmy(o.pagato_at) : 'Da incassare'}</b><br><span class="sub">${o.pagato_at ? 'Provvigione confermata.' : esc(lbl(o.pagamento)) + ': la provvigione si conferma quando l\'ordine risulta pagato.'}</span></span>
+          ${isAdmin() || isViewer() ? `<button class="btn ${o.pagato_at ? 'line ' : ''}sm" id="pagOrd">${o.pagato_at ? 'Annulla pagato' : 'Segna pagato'}</button>` : ''}</div>` : ''}
         <div class="inset" style="margin-top:12px">
           <a href="#/cliente/${cli.id}"><div class="row">
             <span class="av">${esc(ini(cli.insegna || cli.ragione_sociale || '?'))}</span>
@@ -1557,8 +1555,7 @@ addRoute('ordine', async (id, extra) => {
             ${svg('chev', 14, 'chev')}</div></a>
           ${editabile && o.stato === 'bozza' ? `<div class="row"><label>Tipo</label>
             <div class="seg" id="oTipo" style="margin-left:auto;min-width:220px">
-              <button data-tipo-doc="ordine" class="${pren ? '' : 'on'}">Ordine</button>
-              <button data-tipo-doc="prenotazione" class="${pren ? 'on' : ''}">Prenotazione</button></div></div>`
+              ${['ordine', 'prenotazione', 'campionatura'].map(t => `<button data-tipo-doc="${t}" class="${(o.tipo || 'ordine') === t ? 'on' : ''}">${tipoDoc({ tipo: t })}</button>`).join('')}</div></div>`
             : pren ? kv('Tipo', 'Prenotazione') : ''}
           <div class="row"><label for="pag">Pagamento</label>
             <select id="pag" ${editabile ? '' : 'disabled'}>
@@ -1670,13 +1667,13 @@ addRoute('ordine', async (id, extra) => {
         f.tipo = f.tipo === b.dataset.tipo ? '' : b.dataset.tipo; render();
       });
     }
-    $('#main').onclick = e => {                 // assegnazione: non accumula listener a ogni render
-      const inc = e.target.closest('[data-inc]'), dec = e.target.closest('[data-dec]');
-      if (!inc && !dec) return;
-      const w = catalogo.find(x => x.id === (inc || dec).dataset[inc ? 'inc' : 'dec']);
-      const cur = items.get(w.id)?.qty || 0;
-      go(() => setQty(w, cur + (inc ? passo(w) : -passo(w))));
-    };
+    $('#main').onclick = null;
+    $('#main').onwheel = e => { if (e.target === document.activeElement && e.target.matches('input.q')) e.target.blur(); };
+    $('#pagOrd')?.addEventListener('click', () => go(async () => {
+      const r = await sb.rpc('segna_pagato', { p_order: o.id, p_pagato: !o.pagato_at });
+      if (r.error) throw r.error;
+      toast(r.data ? 'Ordine segnato come pagato: provvigione confermata' : 'Pagamento annullato'); route();
+    }));
     $('#mailOrd').addEventListener('click', () => mailOrdine(o, [...items.values()], cli));
     $('#waOrd').addEventListener('click', () => waOrdine(o, [...items.values()], cli));
     $('#dup').addEventListener('click', () => go(async () => {
@@ -1703,6 +1700,7 @@ addRoute('ordine', async (id, extra) => {
         if (r.error) throw r.error;
         Object.assign(o, r.data); render();
         if (o.tipo === 'prenotazione') toast('Prenotazione: le bottiglie restano bloccate 15 giorni dall\'invio', 3500);
+        if (o.tipo === 'campionatura') toast('Campionatura: nessun fatturato né provvigione, il valore a listino scala dal budget campioni', 4500);
       });
     });
     [['#oNote', 'note'], ['#oCons', 'data_consegna'], ['#oIban', 'iban']].forEach(([id, k]) => {
@@ -1759,7 +1757,7 @@ addRoute('ordine', async (id, extra) => {
         if (r.error) throw r.error;
         if (b.dataset.go === 'inviato') {
           const res = await inviaEmailOrdine(o.id);
-          const inv = o.tipo === 'prenotazione' ? 'Prenotazione inviata' : 'Ordine inviato';
+          const inv = tipoDoc(o) + ' inviat' + (o.tipo === 'ordine' || !o.tipo ? 'o' : 'a');
           if (res === 'ok') toast(inv + ' · email partita a ' + ORD_EMAIL_TO[0], 4000);
           else if (res === 'off') { toast(inv + '. Invio email automatico non attivo: uso la tua app di posta', 4500);
             mailOrdine(Object.assign(o, r.data), [...items.values()], cli); }
@@ -1879,7 +1877,7 @@ function pdfOrdine(o, items, cli) {
     .note{margin-top:22px;padding:10px 12px;background:#F4F4EF;border-radius:4px}
     footer{margin-top:30px;font-size:10px;color:#6B6B66}
   </style></head><body>
-  <header><div><div class="brand">${esc(CFG.nome.toUpperCase())}</div><div class="muted">${o.tipo === 'prenotazione' ? 'Prenotazione' : 'Conferma d\'ordine'}</div></div>
+  <header><div><div class="brand">${esc(CFG.nome.toUpperCase())}</div><div class="muted">${o.tipo && o.tipo !== 'ordine' ? tipoDoc(o) : 'Conferma d\'ordine'}</div></div>
     <div style="text-align:right"><h1>${esc(o.numero)}</h1><div class="muted">${dmy(o.inviato_at || o.created_at)} · ${esc(lbl(o.stato))}</div>${o.scade_at && o.stato === 'inviato' ? `<div class="muted">Valida fino al ${dmy(o.scade_at)}</div>` : ''}</div></header>
   <div class="grid">
     <div class="box"><h3>Fatturazione</h3><strong>${esc(D.ragione_sociale || D.insegna || '')}</strong>
@@ -2046,40 +2044,57 @@ addRoute('provvigioni', async () => {
   await ensureClients();
   const anno = S.provAnno || new Date().getFullYear();
   const agenti = Object.values(S.agents).filter(a => a.provvigioni && (a.id === S.me.id || (a.dettaglio_visibile_a || []).includes(S.me.id)));
-  const agId = S.provAgente || S.me.id, ag = S.agents[agId] || S.me;
+  const ids = agenti.map(x => x.id).sort((x, z) => (x === S.me.id ? -1 : z === S.me.id ? 1 : 0));
+  const agId = agenti.length > 1 && (!S.provAgente || !ids.includes(S.provAgente)) ? 'tutti' : (S.provAgente || S.me.id);
+  const sel = agId === 'tutti' ? ids : [agId], insieme = sel.length > 1;
+  const chi = sel.map(i => S.agents[i]?.nome || '').filter(Boolean).join(' e ');
   const da = new Date(anno - 1, 0, 1).toISOString(), a = new Date(anno + 1, 0, 1).toISOString();
   const { data: ords, error } = await sb.from('orders')
-    .select('id, numero, client_id, stato, totale, imponibile, inviato_at, created_at, omaggio_valore, order_items(qty_omaggio, prezzo_unitario)')
-    .eq('agent_id', agId).in('stato', ['inviato', 'confermato', 'evaso']).gte('created_at', da).lt('created_at', a);
+    .select('id, numero, client_id, agent_id, tipo, stato, pagamento, pagato_at, totale, imponibile, inviato_at, created_at, omaggio_valore, order_items(wine_id, wine_label, qty, qty_omaggio, prezzo_unitario)')
+    .in('agent_id', sel).in('stato', ['inviato', 'confermato', 'evaso']).gte('created_at', da).lt('created_at', a);
   if (error) throw error;
   const y = o => new Date(o.inviato_at || o.created_at).getFullYear();
   const isGr = o => !!S.clients.find(c => c.id === o.client_id)?.gruppo;
   const chiusi = o => o.stato === 'confermato' || o.stato === 'evaso';
+  const maturata = o => chiusi(o) && (o.pagamento === 'anticipato' || !!o.pagato_at);   // anticipato = già incassato
   const [{ data: sPrec }, { data: sCur }] = await Promise.all([
     sb.rpc('fatturato_soglia', { p_anno: anno - 1 }), sb.rpc('fatturato_soglia', { p_anno: anno })]);
-  const fattPrec = num(sPrec), fattSoglia = num(sCur);   // fatturato congiunto di chi ha le provvigioni, gruppo escluso
+  const fattPrec = num(sPrec), fattSoglia = num(sCur);   // fatturato congiunto di chi ha le provvigioni, gruppo incluso
   const pct = fattPrec >= PROV.soglia ? PROV.alta : PROV.base;
-  const cur = (ords || []).filter(o => y(o) === anno).map(o => {
+  const isCamp = o => o.tipo === 'campionatura';
+  const campOrd = (ords || []).filter(o => y(o) === anno && isCamp(o));
+  const cur = (ords || []).filter(o => y(o) === anno && !isCamp(o)).map(o => {
     const gr = isGr(o), p = gr ? PROV.gruppo : pct;
     return { ...o, gr, p, prov: Math.round(num(o.totale) * p) / 100 };
   }).sort((x, z) => (z.inviato_at || z.created_at).localeCompare(x.inviato_at || x.created_at));
-  const ok = cur.filter(chiusi), att = cur.filter(o => o.stato === 'inviato');
+  const ok = cur.filter(maturata), att = cur.filter(o => !maturata(o)), conf = cur.filter(chiusi);
+  const daIncassare = att.filter(chiusi).length, daConfermare = att.length - daIncassare;
   const sum = (l, k) => l.reduce((s, o) => s + num(o[k]), 0);
-  const fattCat = sum(ok.filter(o => !o.gr), 'totale'), fattGr = sum(ok.filter(o => o.gr), 'totale');
+  const fattCat = sum(conf.filter(o => !o.gr), 'totale'), fattGr = sum(conf.filter(o => o.gr), 'totale');
   const provOk = sum(ok, 'prov'), provAtt = sum(att, 'prov');
-  const campioni = ok.concat(att).reduce((s, o) => s + Math.max(0, (o.order_items || []).reduce((t, i) => t + (i.qty_omaggio || 0) * num(i.prezzo_unitario), 0) - num(o.omaggio_valore)), 0);
+  const dOrd = o => o.inviato_at || o.created_at;
+  const campRighe = campOrd.flatMap(o => (o.order_items || []).map(i => ({ o, i, v: i.qty * num(i.prezzo_unitario) })))
+    .concat(cur.flatMap(o => (o.order_items || []).filter(i => i.qty_omaggio).map(i => ({ o, i: { ...i, qty: i.qty_omaggio }, v: 0, om: true }))))
+    .sort((x, z) => dOrd(z.o).localeCompare(dOrd(x.o)));
+  const campioni = campOrd.reduce((s, o) => s + (o.order_items || []).reduce((t, i) => t + i.qty * num(i.prezzo_unitario), 0), 0)
+    + cur.reduce((s, o) => s + Math.max(0, (o.order_items || []).reduce((t, i) => t + (i.qty_omaggio || 0) * num(i.prezzo_unitario), 0) - num(o.omaggio_valore)), 0);
+  const refs = [...cur.reduce((m, o) => { (o.order_items || []).forEach(i => {
+      const r = m.get(i.wine_id) || { label: i.wine_label, bt: 0, n: 0, last: '', clienti: new Set() };
+      r.bt += i.qty; r.n++; r.clienti.add(o.client_id); if (dOrd(o) > r.last) r.last = dOrd(o); m.set(i.wine_id, r); }); return m; }, new Map()).values()]
+    .sort((x, z) => z.bt - x.bt || z.last.localeCompare(x.last));
   const perc = v => Math.min(100, Math.round(v * 100));
+  const budget = PROV.campioni * sel.length;
   const mesi = [...Array(12)].map((_, m) => { const l = ok.filter(o => new Date(o.inviato_at || o.created_at).getMonth() === m);
     return { m, fatt: sum(l, 'totale'), prov: sum(l, 'prov') }; });
   const maxP = Math.max(1, ...mesi.map(x => x.prov));
   paint(`<div class="bar"><h1>Provvigioni</h1><span style="flex:1"></span>
       <select id="pAnno" class="btn line sm" style="padding-right:26px">${[0, 1, 2].map(k => new Date().getFullYear() - k).map(v =>
         `<option ${v === anno ? 'selected' : ''}>${v}</option>`).join('')}</select></div>
-    ${agenti.length > 1 ? `<div class="seg" style="margin-bottom:12px">${agenti.map(x =>
-      `<button data-pag="${x.id}" class="${x.id === agId ? 'on' : ''}">${esc(x.nome)}</button>`).join('')}</div>` : ''}
+    ${agenti.length > 1 ? `<div class="seg" style="margin-bottom:12px"><button data-pag="tutti" class="${insieme ? 'on' : ''}">Insieme</button>${ids.map(i =>
+      `<button data-pag="${i}" class="${!insieme && i === agId ? 'on' : ''}">${esc(S.agents[i].nome)}</button>`).join('')}</div>` : ''}
     <div class="kpis">
-      ${kpi('Provvigioni maturate', eur(provOk), `${ok.length} ordini confermati o evasi`)}
-      ${kpi('In attesa di conferma', eur(provAtt), `${att.length} ordini inviati`, att.length ? 'orange' : '')}
+      ${kpi('Provvigioni confermate', eur(provOk), `${ok.length} ordini pagati`)}
+      ${kpi('In attesa', eur(provAtt), [daIncassare ? `${daIncassare} da incassare` : '', daConfermare ? `${daConfermare} da confermare` : ''].filter(Boolean).join(' · ') || 'nessun ordine', att.length ? 'orange' : '')}
       ${kpi('Aliquota catalogo ' + anno, pct + '%', `${anno - 1} insieme: ${eur(fattPrec)}`)}
       ${kpi('Ristoranti del gruppo', PROV.gruppo + '%', `fatturato ${eur(fattGr)}`)}
     </div>
@@ -2088,32 +2103,41 @@ addRoute('provvigioni', async () => {
         <span><b class="mono" style="font-size:20px">${eur(fattSoglia)}</b> <span class="sub">di ${eur(PROV.soglia)} · fatturato catalogo ${anno} di ${esc(Object.values(S.agents).filter(a => a.provvigioni).map(a => a.nome).join(' e '))} insieme</span></span>
         <span class="sub">${fattSoglia >= PROV.soglia ? `✓ Soglia superata: nel ${anno + 1} provvigioni al ${PROV.alta}%` : `Mancano ${eur(PROV.soglia - fattSoglia)}`}</span></div>
       <div class="meter"><i style="width:${perc(fattSoglia / PROV.soglia)}%"></i></div>
-      <div class="sub" style="margin-top:6px">Di cui ordini di ${esc(ag.nome)}: ${eur(fattCat)}</div>
-      <div class="sub" style="margin-top:8px">Se il fatturato annuo complessivo supera ${eur(PROV.soglia)}, l'anno successivo la provvigione sul catalogo sale al ${PROV.alta}%; se scende sotto, torna al ${PROV.base}%. Gli ordini dei ristoranti del gruppo restano al ${PROV.gruppo}% e non contano per la soglia.</div>
+      <div class="sub" style="margin-top:6px">${insieme ? 'Ordini di ' : 'Di cui ordini di '}${esc(chi)}: ${eur(fattCat + fattGr)}${fattGr ? ` (gruppo ${eur(fattGr)})` : ''}</div>
+      <div class="sub" style="margin-top:8px">Se il fatturato annuo complessivo supera ${eur(PROV.soglia)}, l'anno successivo la provvigione sul catalogo sale al ${PROV.alta}%; se scende sotto, torna al ${PROV.base}%. Gli ordini dei ristoranti del gruppo hanno provvigione al ${PROV.gruppo}% ma contano per la soglia.</div>
     </div></div>
     <div class="group"><h3>Campionatura ${anno}</h3><div class="card">
       <div style="display:flex;justify-content:space-between;align-items:baseline;gap:10px;flex-wrap:wrap">
-        <span><b class="mono" style="font-size:20px">${eur(campioni)}</b> <span class="sub">usati di ${eur(PROV.campioni)}</span></span>
-        <span class="sub" style="${campioni > PROV.campioni ? 'color:var(--orange)' : ''}">${campioni > PROV.campioni
-          ? `Budget superato di ${eur(campioni - PROV.campioni)}: i campioni extra si acquistano con sconto ${PROV.scontoCampioni}%`
-          : `Restano ${eur(PROV.campioni - campioni)}`}</span></div>
-      <div class="meter ${campioni > PROV.campioni ? 'over' : ''}"><i style="width:${perc(campioni / PROV.campioni)}%"></i></div>
-      <div class="sub" style="margin-top:8px">Conta il valore a listino delle bottiglie segnate come "Omaggio" negli ordini, escluse quelle della promo sconto merce.</div>
+        <span><b class="mono" style="font-size:20px">${eur(campioni)}</b> <span class="sub">usati di ${eur(budget)}</span></span>
+        <span class="sub" style="${campioni > budget ? 'color:var(--orange)' : ''}">${campioni > budget
+          ? `Budget superato di ${eur(campioni - budget)}: i campioni extra si acquistano con sconto ${PROV.scontoCampioni}%`
+          : `Restano ${eur(budget - campioni)}`}</span></div>
+      <div class="meter ${campioni > budget ? 'over' : ''}"><i style="width:${perc(campioni / budget)}%"></i></div>
+      <div class="sub" style="margin-top:8px">Conta il valore a listino degli ordini di tipo «Campionatura» e delle bottiglie segnate come "Omaggio" negli ordini, escluse quelle della promo sconto merce.</div>
+      ${campRighe.length ? `<div class="inset" style="margin-top:10px">${campRighe.map(({ o, i, v, om }) => `<a href="#/ordine/${o.id}"><div class="row">
+        <span style="flex:1;min-width:0"><span class="ttl" style="font-size:14px">${esc(i.wine_label || '')}</span><br>
+          <span class="sub">${dmy(dOrd(o))} · ${esc(nomeCli(o.client_id))} · ${esc(o.numero)}${om ? ' · omaggio in ordine' : ''}${insieme ? ' · ' + esc(S.agents[o.agent_id]?.nome || '') : ''}</span></span>
+        <span class="mono">${i.qty} bt${v ? ' · ' + eur(v) : ''}</span></div></a>`).join('')}</div>` : ''}
     </div></div>
     <div class="group"><h3>Andamento mensile</h3><div class="card">
       <div class="spark" style="height:90px;gap:6px">${mesi.map(x => `<i class="${x.m === new Date().getMonth() && anno === new Date().getFullYear() ? 'cur' : ''}"
         style="height:${Math.max(4, Math.round(x.prov / maxP * 100))}%" title="${new Date(anno, x.m).toLocaleDateString('it-IT', { month: 'long' })}: ${eur(x.prov)} su ${eur(x.fatt)}"></i>`).join('')}</div>
       <div style="display:flex;gap:6px;margin-top:4px">${mesi.map(x => `<span class="sub" style="flex:1;text-align:center;font-size:10.5px">${new Date(anno, x.m).toLocaleDateString('it-IT', { month: 'narrow' })}</span>`).join('')}</div>
     </div></div>
+    <div class="group"><h3>Referenze ordinate ${anno}</h3><div class="inset">
+      ${refs.map(r => `<div class="row"><span style="flex:1;min-width:0"><span class="ttl" style="font-size:14px">${esc(r.label || '')}</span><br>
+        <span class="sub">${r.n} ${r.n === 1 ? 'ordine' : 'ordini'} · ${r.clienti.size} ${r.clienti.size === 1 ? 'cliente' : 'clienti'} · ultimo ${dmy(r.last)}</span></span>
+        <span class="mono" style="font-weight:700">${r.bt} bt</span></div>`).join('') || '<div class="empty">Nessuna referenza ordinata.</div>'}
+    </div></div>
     <div class="group"><h3>Dettaglio ordini ${anno}</h3><div class="inset">
       ${cur.map(o => `<a href="#/ordine/${o.id}"><div class="row">
         <span style="flex:1;min-width:0"><span class="ttl mono" style="font-size:15px">${esc(o.numero)}</span>
-          ${o.gr ? '<span class="pill" style="background:var(--gold-t);color:var(--gold);margin-left:6px">Gruppo</span>' : ''}<br>
+          ${o.gr ? '<span class="pill" style="background:var(--gold-t);color:var(--gold);margin-left:6px">Gruppo</span>' : ''}${insieme ? `<span class="pill" style="margin-left:6px">${esc(S.agents[o.agent_id]?.nome || '')}</span>` : ''}<br>
           <span class="sub">${esc(nomeCli(o.client_id))} · ${dmy(o.inviato_at || o.created_at)} · netto ${eur(o.totale)} × ${o.p}%</span></span>
-        <span class="mono" style="font-weight:700">${eur(o.prov)}</span>${pill(o.stato)}</div></a>`).join('')
+        <span class="mono" style="font-weight:700${maturata(o) ? '' : ';color:var(--fg2)'}">${eur(o.prov)}</span>${chiusi(o) && !maturata(o) ? '<span class="pill" style="background:var(--orange-t);color:var(--orange)">Da incassare</span>' : pill(o.stato)}</div></a>`).join('')
         || '<div class="empty">Nessun ordine inviato in questo anno.</div>'}
     </div></div>
-    <div class="empty" style="padding:12px 4px">Calcolo sul netto dell'ordine: dopo sconti di riga, sconto cliente e sconto pagamento anticipato; IVA e trasporto esclusi. Le bottiglie in omaggio non generano provvigione.</div>`);
+    <div class="empty" style="padding:12px 4px">La provvigione è confermata quando l'ordine è pagato: subito per il pagamento anticipato, per Bonifico e Ri.Ba. quando l'ordine viene segnato «pagato». Calcolo sul netto dell'ordine: dopo sconti di riga, sconto cliente e sconto pagamento anticipato; IVA e trasporto esclusi. Le bottiglie in omaggio non generano provvigione.</div>`);
   $('#pAnno').addEventListener('change', e => { S.provAnno = +e.target.value; route(); });
   document.querySelectorAll('[data-pag]').forEach(b => b.addEventListener('click', () => { S.provAgente = b.dataset.pag; route(); }));
 }, 'provvigioni');
