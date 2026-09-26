@@ -162,7 +162,7 @@ function renderShell() {
   $('#root').innerHTML = `<div id="app">
     <aside id="side">
       <div class="brand">${esc(CFG.nome)}</div>
-      <nav>${NAV.filter(n => n[0] !== 'provvigioni' || S.me.provvigioni).map(([k, l, h]) =>
+      <nav>${NAV.filter(n => n[0] !== 'provvigioni' || vedeProv()).map(([k, l, h]) =>
         `<a href="${h}" data-nav="${k}">${svg(k, 18)}<span>${l}</span><span class="n" data-n="${k}"></span></a>`).join('')}</nav>
       ${temaBtn()}
       <div class="me">
@@ -199,6 +199,7 @@ document.addEventListener('click', e => {
 const temaBtn = (cls = '') => `<button class="btn line sm theme-btn ${cls}" type="button" aria-label="Cambia tema">${svg('tema', 15)}
   <span data-tema-lbl>${TEMI.find(x => x[0] === temaCorrente())[1]}</span></button>`;
 const isViewer = () => S.me?.ruolo === 'viewer';
+const vedeProv = () => !!S.me?.provvigioni || isViewer();   // viewer = amministrazione centrale: vede e liquida le provvigioni di tutti
 const mine = c => c.agent_id === S.me.id;
 const canEdit = c => isAdmin() || mine(c);
 const canOrder = c => isAdmin() || isViewer() || mine(c);
@@ -277,8 +278,8 @@ addRoute('home', async () => {
       ${kpi('Clienti', String(S.clients.length), isAdmin() || isViewer() ? 'in rete' : `in rete · ${S.clients.filter(mine).length} tuoi`)}
       ${kpi('Da richiamare', String((recall || []).length), 'oltre il ritmo abituale', recall?.length ? 'orange' : '')}
     </div>
-    ${S.me.provvigioni ? `<a href="#/provvigioni" class="hide-desktop"><div class="inset" style="margin-top:12px"><div class="row">
-      ${svg('provvigioni', 20)}<span style="flex:1"><span class="ttl" style="font-size:15px">Le mie provvigioni</span></span>${svg('chev', 14, 'chev')}</div></div></a>` : ''}
+    ${vedeProv() ? `<a href="#/provvigioni" class="hide-desktop"><div class="inset" style="margin-top:12px"><div class="row">
+      ${svg('provvigioni', 20)}<span style="flex:1"><span class="ttl" style="font-size:15px">${isViewer() ? 'Provvigioni agenti' : 'Le mie provvigioni'}</span></span>${svg('chev', 14, 'chev')}</div></div></a>` : ''}
     <div class="group"><h3>Promemoria · prossimi 7 giorni</h3><div class="inset" id="promList">
       ${(prom || []).map(r => rigaProm(r, true)).join('') || '<div class="empty">Niente in agenda. Aggiungi promemoria e appuntamenti dalla scheda cliente.</div>'}
     </div></div>
@@ -2040,12 +2041,13 @@ async function scaricaBackup() {
 /* ---------- Provvigioni ---------- */
 const PROV = { base: 10, alta: 12, gruppo: 5, soglia: 70000, campioni: 300, scontoCampioni: 25 };
 addRoute('provvigioni', async () => {
-  if (!S.me.provvigioni) { paint('<div class="empty">Pagina non disponibile per il tuo profilo.</div>'); return; }
+  if (!vedeProv()) { paint('<div class="empty">Pagina non disponibile per il tuo profilo.</div>'); return; }
   await ensureClients();
   const anno = S.provAnno || new Date().getFullYear();
-  const agenti = Object.values(S.agents).filter(a => a.provvigioni && (a.id === S.me.id || (a.dettaglio_visibile_a || []).includes(S.me.id)));
+  const agenti = Object.values(S.agents).filter(a => a.provvigioni && (isViewer() || a.id === S.me.id || (a.dettaglio_visibile_a || []).includes(S.me.id)));
+  if (!agenti.length) { paint('<div class="empty">Nessun agente con provvigioni.</div>'); return; }
   const ids = agenti.map(x => x.id).sort((x, z) => (x === S.me.id ? -1 : z === S.me.id ? 1 : 0));
-  const agId = agenti.length > 1 && (!S.provAgente || !ids.includes(S.provAgente)) ? 'tutti' : (S.provAgente || S.me.id);
+  const agId = agenti.length > 1 && (!S.provAgente || !ids.includes(S.provAgente)) ? 'tutti' : (ids.includes(S.provAgente) ? S.provAgente : ids[0]);
   const sel = agId === 'tutti' ? ids : [agId], insieme = sel.length > 1;
   const chi = sel.map(i => S.agents[i]?.nome || '').filter(Boolean).join(' e ');
   const da = new Date(anno - 1, 0, 1).toISOString(), a = new Date(anno + 1, 0, 1).toISOString();
