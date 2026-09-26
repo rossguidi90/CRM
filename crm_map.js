@@ -30,11 +30,11 @@ const CrmMap = (() => {
     const wait = 1100 - (Date.now() - lastCall);
     if (wait > 0) await new Promise(r => setTimeout(r, wait));
     lastCall = Date.now();
-    const res = await fetch('https://nominatim.openstreetmap.org/search?format=jsonv2&limit=1&countrycodes=it'
+    const res = await fetch('https://nominatim.openstreetmap.org/search?format=jsonv2&limit=1&countrycodes=it&addressdetails=1'
       + `&viewbox=${VIEWBOX}&q=${encodeURIComponent(q)}`, { headers: { 'Accept-Language': 'it' } });
     if (!res.ok) throw new Error(`Geocoding HTTP ${res.status}`);
     const [hit] = await res.json();
-    const out = hit ? { lat: +hit.lat, lng: +hit.lon } : null;
+    const out = hit ? { lat: +hit.lat, lng: +hit.lon, zona: CrmInsights.zonaDi(hit.address || {}) } : null;
     cache.set(key, out);
     return out;
   }
@@ -42,9 +42,13 @@ const CrmMap = (() => {
   // Da chiamare prima di insert/update cliente: restituisce i campi geo da aggiungere al payload
   async function geoPatch(next, prev) {
     const changed = !prev || ['indirizzo', 'cap', 'citta'].some(k => (prev[k] ?? '') !== (next[k] ?? ''));
-    if (!changed || !next.indirizzo) return {};
+    if ((!changed && next.zona) || !next.indirizzo) return {};
     const p = await geocode(next).catch(() => null);
-    return p ? { ...p, geo_manual: false } : { lat: null, lng: null, geo_manual: false };
+    if (!p) return changed ? { lat: null, lng: null, geo_manual: false } : {};
+    const { zona, ...geo } = p;
+    const out = changed ? { ...geo, geo_manual: false } : {};
+    if (!next.zona && zona) out.zona = zona;            // zona solo se non compilata a mano
+    return out;
   }
 
   // Import massivo: geocodifica sequenziale dei clienti senza coordinate

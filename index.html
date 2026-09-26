@@ -325,6 +325,8 @@ input[type=checkbox]{accent-color:#7A1F2B;width:20px;height:20px}
 /* ---- fuori zona ---- */
 .stamp{display:inline-block;margin:0 0 4px;padding:2px 8px;border:1.5px solid var(--red);border-radius:6px;color:var(--red);
   font-size:10.5px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;transform:rotate(-2deg);background:color-mix(in srgb,var(--red) 8%,transparent)}
+.venue-sugg{margin:-1px 10px 6px;border:1px solid var(--sep);border-radius:12px;overflow:hidden;background:var(--card);box-shadow:0 6px 18px rgb(0 0 0/.12)}
+.venue-sugg .row{width:100%;background:none;border-left:0;border-right:0;border-bottom:0;font:inherit;color:inherit;cursor:pointer}
 .stamp.arr{border-color:var(--gold);color:var(--gold)}
 .stamp.sm{font-size:9.5px;padding:1px 6px;margin-bottom:2px}
 .row.fz,.cart-item.fz{background-image:repeating-linear-gradient(135deg,color-mix(in srgb,var(--red) 7%,transparent) 0 8px,transparent 8px 16px)}
@@ -410,10 +412,10 @@ if ('serviceWorker' in navigator) addEventListener('load', () => navigator.servi
   addEventListener('online', stato); addEventListener('offline', stato); addEventListener('load', stato);
 })();
 </script>
-<script src="crm_map.js?v=7"></script>
-<script src="crm_insights.js?v=5"></script>
+<script src="crm_map.js?v=8"></script>
+<script src="crm_insights.js?v=6"></script>
 <script src="crm_client_form.js?v=9"></script>
-<script src="crm.js?v=41"></script>
+<script src="crm.js?v=42"></script>
 <script>
 // Diagnostica: se dopo 9 secondi l'app non è partita, dice cosa manca invece di girare a vuoto.
 (function () {

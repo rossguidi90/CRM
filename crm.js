@@ -644,7 +644,6 @@ function editCliente(c, contatti = [], sezione) {
   const m = modal(`<div class="bar"><h2>${nuovo ? 'Nuovo cliente' : 'Modifica scheda'}</h2>
       <span style="flex:1"></span><button class="btn line sm" data-x>Chiudi</button></div>
     <div id="cf"></div>
-    <div id="vs" class="empty hide"></div>
     <div style="display:flex;gap:8px;margin-top:14px">
       <button class="btn ghost" id="desc" style="flex:1">Descrizione dal web</button>
       <button class="btn" id="save" style="flex:2">Salva</button>
@@ -667,21 +666,25 @@ function editCliente(c, contatti = [], sezione) {
   CrmClientForm.bind(host, {
     rerender: ({ client, contacts }) => draw(client, contacts),
     onVenueInput: q => go(async () => {
-      if (!nuovo || q.trim().length < 3) return;
+      const inp = host.querySelector('[data-venue-search]');
+      host.querySelector('.venue-sugg')?.remove();
+      if (!nuovo || !inp || q.trim().length < 3) return;
       const cand = await CrmInsights.searchVenue(q, 6);
-      if (!cand.length) return;
-      const box = $('#vs', m);
-      box.className = 'inset';
-      box.innerHTML = `<div class="row"><label>Trovati su OpenStreetMap</label></div>` + cand.map((x, i) =>
-        `<button class="row" data-cand="${i}"><span style="flex:1;min-width:0">
-          <span class="ttl">${esc(x.insegna)}</span><br><span class="sub">${esc(x.indirizzo || x.citta)}</span></span>
+      if (!cand.length || inp.value.trim() !== q.trim()) return;
+      const box = document.createElement('div');
+      box.className = 'venue-sugg';
+      box.innerHTML = cand.map((x, i) => `<button type="button" class="row" data-cand="${i}"><span style="flex:1;min-width:0;text-align:left">
+          <span class="ttl">${esc(x.insegna)}</span><br><span class="sub">${esc([x.indirizzo, x.zona, x.citta].filter(Boolean).join(' · '))}</span></span>
           ${svg('chev', 14, 'chev')}</button>`).join('');
-      box.onclick = e => {
+      inp.closest('.row').after(box);
+      box.onclick = e => go(async () => {
         const b = e.target.closest('[data-cand]'); if (!b) return;
+        box.innerHTML = '<div class="row"><span class="sub">Recupero indirizzo e zona…</span></div>';
+        const full = await CrmInsights.venueDetails(cand[+b.dataset.cand]);
         const cur = CrmClientForm.read(host.querySelector('form'));
-        draw(CrmClientForm.applyCandidate(cur.client, cand[+b.dataset.cand]), cur.contacts);
-        box.className = 'empty hide'; box.innerHTML = '';
-      };
+        draw(CrmInsights.applyCandidate(cur.client, full), cur.contacts);
+        toast('Dati del locale inseriti: controllali prima di salvare');
+      });
     })
   });
   $('#desc', m).addEventListener('click', e => go(async () => {
