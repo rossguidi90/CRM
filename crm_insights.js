@@ -37,7 +37,9 @@ const CrmInsights = (() => {
       { signal: ctrl.signal });
     if (!res.ok) throw new Error(`Ricerca locali HTTP ${res.status}`);
     const { features = [] } = await res.json();
-    return features.filter(f => f.properties?.name && LOCALI.test(`${f.properties.osm_key}:${f.properties.osm_value}`))
+    let k; const visti = new Set();   // stesso locale mappato due volte (punto + edificio)
+    return features.filter(({ properties: p }) => p?.name && LOCALI.test(`${p.osm_key}:${p.osm_value}`) &&
+        !visti.has(k = `${p.name}|${p.street}|${p.city}`.toLowerCase()) && visti.add(k))
       .slice(0, limit).map(({ properties: p, geometry: g }) => ({
         osm_ref: `${p.osm_type}${p.osm_id}`,
         insegna: p.name,
