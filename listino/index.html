@@ -90,6 +90,7 @@ main{max-width:1080px;margin:0 auto;padding:8px 16px 60px}
 .foot a{color:var(--cream)}
 .load{padding:80px 0;text-align:center;color:var(--ink2)}
 .printhead{display:none}
+.cover,.idx,.liste{display:none}
 @media (max-width:640px){
   .top h1{font-size:34px}
   .w{grid-template-columns:48px 1fr;gap:0 14px}
@@ -106,18 +107,58 @@ main{max-width:1080px;margin:0 auto;padding:8px 16px 60px}
 }
 /* stampa / PDF */
 @page{size:A4;margin:13mm 12mm 14mm}
+@page :first{margin:0}
 @media print{
   body{background:#fff;font-size:9pt}
   .bar,.more,.top .agg,.noprint{display:none!important}
   .top{padding:0;background:#fff;color:var(--ink);text-align:left}
   .top>*{display:none}
-  .printhead{display:flex;align-items:center;justify-content:space-between;border-bottom:1.5px solid var(--ink);padding-bottom:3mm;margin-bottom:2mm}
+  .printhead{display:none;align-items:center;justify-content:space-between;border-bottom:1.5px solid var(--ink);padding-bottom:3mm;margin-bottom:2mm}
   .printhead .l{display:flex;align-items:center;gap:3mm}.printhead .logo{width:16mm;color:var(--ink)}
   .printhead .nm{font:700 9pt var(--sans);letter-spacing:.38em;text-transform:uppercase}
   .printhead .r{text-align:right;font-size:7.5pt;color:var(--ink2);line-height:1.4}
   .printhead .r b{font:500 italic 15pt var(--serif);color:var(--ink);display:block}
   main{max-width:none;padding:0}
-  .naz{break-before:page;margin-top:0}.naz:first-of-type{break-before:auto;margin-top:4mm}
+  .naz{break-before:page;margin-top:0}
+  .cover{display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;width:210mm;height:297mm;background:var(--dark);color:var(--cream);position:relative;break-after:page}
+  .cover .logo{width:60mm;color:var(--cream);margin-bottom:11mm}
+  .cover .nm{font:700 15pt/1 var(--sans);letter-spacing:.42em;margin-right:-.42em;text-transform:uppercase}
+  .cover .rl{width:18mm;height:1px;background:var(--bord);margin:10mm auto 8mm}
+  .cover h1{font:500 italic 40pt/1 var(--serif)}
+  .cover .sb{margin-top:5mm;color:#A9A49B;font-size:8.5pt;letter-spacing:.16em;text-transform:uppercase}
+  .cover .stats{display:flex;gap:14mm;margin-top:16mm}
+  .cover .stats b{display:block;font:500 26pt/1 var(--serif);color:var(--cream)}
+  .cover .stats span{font-size:6.5pt;letter-spacing:.24em;text-transform:uppercase;color:#A9A49B}
+  .cover .ft{position:absolute;bottom:16mm;left:0;right:0;color:#8C877F;font-size:7pt;letter-spacing:.2em;text-transform:uppercase;line-height:1.9}
+  .cover .ft a{color:#C9C3B8;text-decoration:none}
+  .idx{display:block;break-after:page}
+  .idx h2,.lst h2{font:500 italic 26pt/1 var(--serif);border-bottom:1.5px solid var(--ink);padding-bottom:3mm;margin-bottom:5mm}
+  .idx .cols{column-count:2;column-gap:10mm}
+  .idx a{color:inherit;text-decoration:none}
+  .idx .q{break-inside:avoid;margin-bottom:5mm;display:flex;gap:6mm;column-span:all}
+  .idx .q a{flex:1;border:1px solid var(--line);border-radius:3mm;padding:3mm 4mm;font:500 italic 13pt var(--serif)}
+  .idx .q a small{display:block;font:600 6.3pt var(--sans);letter-spacing:.2em;text-transform:uppercase;color:var(--ink3);font-style:normal;margin-top:1mm}
+  .idx .n{margin-bottom:3mm}
+  .idx .n>a{display:block;font:600 7pt var(--sans);letter-spacing:.26em;text-transform:uppercase;color:var(--bord);border-bottom:1px solid var(--line);padding-bottom:1.3mm;margin-bottom:1.8mm}
+  .idx .r{break-inside:avoid;margin-bottom:1.8mm}
+  .idx .r>a{display:block;font:600 7.6pt var(--sans);margin-bottom:.6mm}
+  .idx .r div a{display:flex;justify-content:space-between;font-size:7.6pt;color:#3E3D39;padding:.1mm 0}
+  .idx .r div a i{font-style:normal;color:var(--ink3)}
+  .liste{display:block}
+  .lst{break-before:page}
+  .lst h2 span{font:600 7pt var(--sans);letter-spacing:.24em;text-transform:uppercase;color:var(--ink3);font-style:normal;margin-left:3mm}
+  .lst table{width:100%;border-collapse:collapse;font-size:8pt}
+  .lst th{font:600 6.3pt var(--sans);letter-spacing:.18em;text-transform:uppercase;color:var(--ink3);text-align:left;padding:0 2mm 1.6mm 0;border-bottom:1px solid var(--ink)}
+  .lst td{padding:1.7mm 2mm 1.7mm 0;border-bottom:1px solid var(--line);vertical-align:top}
+  .lst tr{break-inside:avoid}
+  .lst tr.g td{font:600 6.8pt var(--sans);letter-spacing:.22em;text-transform:uppercase;color:var(--bord);padding-top:4mm;border-bottom:1px solid var(--line)}
+  .lst td a{color:inherit;text-decoration:none}
+  .lst .vn{font:600 10pt/1.15 var(--serif)}.lst .vn em{color:var(--bord);font-weight:500}
+  .lst .pp{font-size:7.2pt;color:var(--ink2);margin-top:.5mm}
+  .lst .nr{text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums}
+  .lst .pz2{font-weight:600;font-size:9pt}
+  .lst .bd{justify-content:flex-start;max-width:none}
+  .lst .vuoto{color:var(--ink2);font-size:8.5pt;padding:4mm 0}
   .naz h2{font-size:26pt}
   .reg{break-after:avoid;margin-top:5mm}
   .prod{break-inside:auto;margin-top:2mm;padding-top:3mm}
@@ -160,6 +201,9 @@ main{max-width:1080px;margin:0 auto;padding:8px 16px 60px}
   </div>
 </nav>
 
+<section class="cover" id="cover"></section>
+<section class="idx" id="idx"></section>
+<section class="liste" id="liste"></section>
 <main id="list"><div class="load">Caricamento del listino…</div></main>
 
 <footer class="foot">
@@ -179,7 +223,10 @@ const NAZ = ['Italia', 'Francia', 'Germania', 'Spagna'];
 const REG = ['Lombardia','Trentino-Alto Adige','Veneto','Piemonte','Toscana','Marche','Champagne','Jura','Borgogna','Beaujolais','Bugey','Savoia','Ardèche','Rodano','Bordeaux','Loira','Languedoc','Roussillon','Baden','Franconia','Galizia','Spagna'];
 const TIP = ['bollicine','champagne','rifermentato','bianco','macerato','rosato','rosso'];
 const TCOL = {bollicine:'#C9A64B',champagne:'#B8964A',rifermentato:'#9DB07A',bianco:'#D9C27A',macerato:'#D08A3C',rosato:'#D98C8C',rosso:'#7A1F2B'};
-const GRUPPI = [['', 'Tutti'], ['bollicine,champagne,rifermentato', 'Bollicine'], ['bianco', 'Bianchi'], ['macerato', 'Macerati'], ['rosato', 'Rosati'], ['rosso', 'Rossi']];
+const GRUPPI = [['', 'Tutti'], ['bollicine,champagne,rifermentato', 'Bollicine'], ['bianco', 'Bianchi'], ['macerato', 'Macerati'], ['rosato', 'Rosati'], ['rosso', 'Rossi'], ['MG', 'Magnum'], ['DOLCI', 'Dolci']];
+const BOLLE = ['bollicine', 'champagne', 'rifermentato'];
+const DOLCE = /sp[aä]tlese|auslese|beerenauslese|passito|vendemmia tardiva|vendanges tardives|moelleux|liquoreux|recioto|sauternes|vin santo|vin doux|muffa nobile|botrytis|icewine|eiswein/i;
+const dolce = w => (w.st || []).includes('dolce') || DOLCE.test(w.n) || DOLCE.test((w.x.s || []).filter(([k]) => /vinificazione/i.test(k)).map(([, v]) => v).join(' '));
 const DISP = {assegnazione:['as','Assegnazione'], in_arrivo:['ar','In arrivo'], limitato:['li','Quantità limitata'], in_esaurimento:['es','In esaurimento'], su_prenotazione:['pn','Su prenotazione']};
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -230,7 +277,7 @@ function prepara() {
   $('#zona').innerHTML = '<option value="">Tutte le zone</option>' + Object.keys(zone).map(n =>
     `<optgroup label="${esc(n)}"><option value="N|${esc(n)}">Tutta ${esc(n)}</option>${[...zone[n]].map(r => `<option value="R|${esc(n)}|${esc(r)}">${esc(r)}</option>`).join('')}</optgroup>`).join('');
   $('#zona').value = st.zona;
-  $('#tipi').innerHTML = GRUPPI.map(([k, l]) => `<button class="chip" data-t="${k}" aria-pressed="${st.tipi === k}">${k ? `<i class="dot" style="background:${TCOL[k.split(',')[0]]}"></i>` : ''}${l}</button>`).join('')
+  $('#tipi').innerHTML = GRUPPI.map(([k, l]) => `<button class="chip" data-t="${k}" aria-pressed="${st.tipi === k}">${k ? `<i class="dot" style="background:${TCOL[k.split(',')[0]] || '#161614'}"></i>` : ''}${l}</button>`).join('')
     + '<span class="count" id="cnt"></span>';
 }
 
@@ -252,7 +299,7 @@ function riga(w) {
   const zona = [w.z, w.r].filter((v, i, a) => v && a.indexOf(v) === i && v !== w.naz).join(' · ');
   const sch = (x.s || []).map(([k, v]) => `<dt>${esc(k)}</dt><dd>${esc(v)}</dd>`).join('');
   const prezzo = w.promo ? `<s>${eur(w.pr)}</s>${eur(w.pr * (1 - w.promo / 100))}` : eur(w.pr);
-  return `<article class="w"><div class="bt">${img || bottiglia(w.t)}</div>
+  return `<article class="w" id="w${w.id}"><div class="bt">${img || bottiglia(w.t)}</div>
     <div><div class="tp"><i class="dot" style="background:${TCOL[w.t] || '#999'}"></i>${esc(w.t)}${w.l ? ' · ' + esc(w.l) : ''}</div>
       <div class="wn">${esc(w.n)}${an ? ` <em>${esc(an)}</em>` : ''}</div>
       ${w.v ? `<div class="vit">${esc(w.v)}</div>` : ''}${x.vd ? `<div class="vd">${esc(x.vd)}</div>` : ''}
@@ -261,24 +308,63 @@ function riga(w) {
     <div class="pz"><div class="pr">${prezzo}</div><div class="fmt">${w.f} cl</div><div class="bd">${badge(w)}</div></div></article>`;
 }
 
+const slug = s => norm(s).replace(/[^a-z0-9]+/g, '-');
+function lista(tit, sotto, W, gruppo, noMg) {
+  let h = `<section class="lst" id="l-${slug(tit)}"><h2>${tit}<span>${W.length} referenz${W.length === 1 ? 'a' : 'e'}</span></h2>`;
+  if (!W.length) return h + `<div class="vuoto">${sotto}</div></section>`;
+  h += '<table><thead><tr><th>Vino</th><th>Vitigni</th><th>Zona</th><th class="nr">Formato</th><th class="nr">Prezzo</th></tr></thead><tbody>';
+  let g;
+  for (const w of W) {
+    const k = gruppo(w); if (k !== g) { g = k; h += `<tr class="g"><td colspan="5">${esc(k)}</td></tr>`; }
+    const an = !w.a ? '' : /^(sa|nv)$/i.test(w.a) ? 's.a.' : w.a;
+    const pr = w.promo ? eur(w.pr * (1 - w.promo / 100)) : eur(w.pr);
+    h += `<tr><td><a href="#w${w.id}"><div class="vn">${esc(w.n)}${an ? ` <em>${esc(an)}</em>` : ''}</div><div class="pp">${esc(nomeProd(w.p))}</div></a>${(b => b ? `<div class="bd" style="margin-top:1mm">${b}</div>` : '')(noMg ? badge(w).replace('<span class="b mg">Magnum</span>', '') : badge(w))}</td>
+      <td>${esc(w.v || '')}</td><td>${esc([w.r, w.naz].filter(Boolean).join(', '))}</td><td class="nr">${w.f} cl</td><td class="nr pz2">${pr}</td></tr>`;
+  }
+  return h + '</tbody></table></section>';
+}
+function stampa(L, IX) {
+  const nprod = new Set(L.map(w => w.p)).size, npaesi = new Set(L.map(w => w.naz)).size;
+  const d = AGG ? AGG.toLocaleDateString('it-IT', { day: 'numeric', month: 'long', year: 'numeric' }) : '';
+  $('#cover').innerHTML = `<svg class="logo" viewBox="0 0 64 24"><use href="#lg"/></svg><div class="nm">Wine Alchemist</div><div class="rl"></div>
+    <h1>Listino vini</h1><div class="sb">Distribuzione vini italiani ed esteri</div>
+    <div class="stats"><div><b>${L.length}</b><span>Referenze</span></div><div><b>${nprod}</b><span>Produttori</span></div><div><b>${npaesi}</b><span>Paesi</span></div></div>
+    <div class="ft">Aggiornato al ${esc(d)}<br><a href="mailto:info@winealchemist.it">info@winealchemist.it</a></div>`;
+  const bolle = L.filter(w => BOLLE.includes(w.t)), mg = L.filter(w => w.f >= 150), dol = L.filter(dolce);
+  const ordT = (a, b) => idx(TIP, a.t) - idx(TIP, b.t);
+  const TNOME = { bollicine: 'Bollicine', champagne: 'Champagne', rifermentato: 'Rifermentati', bianco: 'Bianchi', macerato: 'Macerati', rosato: 'Rosati', rosso: 'Rossi' };
+  let h = '<h2>Indice</h2><div class="cols"><div class="q">'
+    + [['Bollicine', bolle], ['Magnum', mg], ['Vini dolci', dol]].map(([t, W]) => `<a href="#l-${slug(t)}">${t}<small>${W.length} referenz${W.length === 1 ? 'a' : 'e'} · lista</small></a>`).join('') + '</div>';
+  let naz, reg = undefined;
+  for (const e of IX) {
+    if (e.naz !== naz) { if (naz) h += '</div></div></div>'; naz = e.naz; reg = undefined; h += `<div class="n"><a href="#n-${slug(naz)}">${esc(naz)}</a>`; }
+    if (e.reg !== reg) { if (reg !== undefined) h += '</div></div>'; reg = e.reg; h += `<div class="r"><a href="#r-${slug(naz + '-' + reg)}">${esc(reg || '—')}</a><div>`; }
+    h += `<a href="#${e.id}"><span>${esc(e.p)}</span><i>${e.c}</i></a>`;
+  }
+  if (naz) h += '</div></div></div>';
+  $('#idx').innerHTML = h + '</div>';
+  $('#liste').innerHTML = lista('Bollicine', 'Nessuna bollicina a listino.', [...bolle].sort(ordT), w => TNOME[w.t])
+    + lista('Magnum', 'Nessun magnum a listino.', [...mg].sort(ordT), w => TNOME[w.t] || w.t, true)
+    + lista('Vini dolci', 'Nessun vino dolce a listino al momento.', dol, w => w.naz);
+}
 function disegna() {
   if (!DATA) return;
   const q = norm(st.q).trim().split(/\s+/).filter(Boolean), T = st.tipi ? st.tipi.split(',') : null;
   const [zt, zn, zr] = st.zona.split('|');
-  const L = DATA._v.filter(w => (!T || T.includes(w.t)) && (!zt || w.naz === zn && (zt === 'N' || w.r === zr)) && q.every(t => w._q.includes(t)));
+  const L = DATA._v.filter(w => (!T || (st.tipi === 'MG' ? w.f >= 150 : st.tipi === 'DOLCI' ? dolce(w) : T.includes(w.t))) && (!zt || w.naz === zn && (zt === 'N' || w.r === zr)) && q.every(t => w._q.includes(t)));
   $('#cnt').textContent = L.length + (L.length === 1 ? ' referenza' : ' referenze');
   document.body.classList.toggle('noschede', !st.schede);
   $('#sch').setAttribute('aria-pressed', st.schede);
-  if (!L.length) { $('#list').innerHTML = '<div class="empty">Nessun vino corrisponde alla ricerca.</div>'; $('#vai').innerHTML = '<option value="">Produttori</option>'; return; }
-  let h = '', naz, reg, prod, n = 0; const prods = [];
+  if (!L.length) { stampa([], []); $('#list').innerHTML = '<div class="empty">Nessun vino corrisponde alla ricerca.</div>'; $('#vai').innerHTML = '<option value="">Produttori</option>'; return; }
+  let h = '', naz, reg, prod, n = 0; const prods = [], IX = [];
   for (const w of L) {
     if (w.naz !== naz) { if (prod) h += '</section>'; prod = reg = null; naz = w.naz;
-      const c = L.filter(v => v.naz === naz).length; h += `<div class="naz"><h2>${esc(naz)}</h2><span>${c} referenz${c === 1 ? 'a' : 'e'}</span></div>`; }
-    if (w.r !== reg) { if (prod) h += '</section>'; prod = null; reg = w.r; h += `<div class="reg"><h3>${esc(reg || '—')}</h3></div>`; }
+      const c = L.filter(v => v.naz === naz).length; h += `<div class="naz" id="n-${slug(naz)}"><h2>${esc(naz)}</h2><span>${c} referenz${c === 1 ? 'a' : 'e'}</span></div>`; }
+    if (w.r !== reg) { if (prod) h += '</section>'; prod = null; reg = w.r; h += `<div class="reg" id="r-${slug(naz + '-' + reg)}"><h3>${esc(reg || '—')}</h3></div>`; }
     if (w.p !== prod) {
       if (prod) h += '</section>';
       prod = w.p; const P = SCH.produttori[w.p] || {}, id = 'p' + (++n);
-      prods.push([id, nomeProd(w.p)]);
+      prods.push([id, nomeProd(w.p)]); IX.push({ naz, reg, id, p: nomeProd(w.p), c: L.filter(v => v.p === w.p && v.naz === naz && v.r === reg).length });
       const loc = [P.loc, w.r].filter((v, i, a) => v && a.indexOf(v) === i).join(' · ');
       h += `<section class="prod" id="${id}"><div class="keep"><div class="ph"><div><h4>${esc(nomeProd(w.p))}</h4>${loc ? `<div class="loc">${esc(loc)}</div>` : ''}</div>
         ${P.desc ? `<p class="desc">${esc(P.desc)}</p><button class="more">Leggi tutto</button>` : ''}</div>` + riga(w) + '</div>';
@@ -288,6 +374,7 @@ function disegna() {
   }
   $('#list').innerHTML = h + '</section>';
   $('#vai').innerHTML = '<option value="">Produttori</option>' + prods.sort((a, b) => a[1].localeCompare(b[1], 'it')).map(([id, p]) => `<option value="${id}">${esc(p)}</option>`).join('');
+  stampa(L, IX);
   document.querySelectorAll('.desc').forEach(d => { if (d.scrollHeight <= d.clientHeight + 2) d.nextElementSibling.remove(); });
 }
 
