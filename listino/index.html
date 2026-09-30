@@ -1,0 +1,309 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Wine Alchemist · Listino vini</title>
+<meta name="description" content="Listino vini Wine Alchemist, sempre aggiornato su disponibilità e prezzi.">
+<meta name="theme-color" content="#141211">
+<meta property="og:title" content="Wine Alchemist · Listino vini">
+<meta property="og:description" content="Listino sempre aggiornato: produttori, vitigni, schede tecniche e disponibilità.">
+<link rel="icon" href="../favicon.png">
+<link rel="apple-touch-icon" href="../apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,600;1,500;1,600&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{--ink:#161614;--ink2:#5E5D57;--ink3:#9A9891;--paper:#FBFAF7;--card:#fff;--line:#E7E4DD;--fill:#F2EFE9;
+  --dark:#141211;--cream:#F6F2EA;--bord:#7A1F2B;--gold:#8A6A1E;--gold-t:#F3EBDD;
+  --serif:"Cormorant Garamond",Georgia,serif;--sans:Inter,-apple-system,"Helvetica Neue",sans-serif}
+*{box-sizing:border-box;margin:0;padding:0}
+html{-webkit-text-size-adjust:100%;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+body{font:400 14px/1.45 var(--sans);color:var(--ink);background:var(--paper)}
+button,input,select{font:inherit;color:inherit}
+.logo{display:block}
+/* testata */
+.top{background:var(--dark);color:var(--cream);padding:34px 16px 30px;text-align:center}
+.top .logo{width:74px;margin:0 auto 14px;color:var(--cream)}
+.top .nm{font:700 13px/1 var(--sans);letter-spacing:.42em;text-transform:uppercase;margin-right:-.42em}
+.top h1{font:500 italic 40px/1.05 var(--serif);margin-top:14px}
+.top .agg{margin-top:10px;color:#A9A49B;font-size:11.5px;letter-spacing:.14em;text-transform:uppercase}
+.top .agg b{color:var(--cream);font-weight:600}
+.top .agg.old b{color:#F2A65A}
+/* barra filtri */
+.bar{position:sticky;top:0;z-index:5;background:rgba(251,250,247,.94);backdrop-filter:saturate(1.4) blur(12px);-webkit-backdrop-filter:saturate(1.4) blur(12px);border-bottom:1px solid var(--line)}
+.bar .in{max-width:1080px;margin:0 auto;padding:10px 16px;display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.srch{flex:1 1 240px;min-width:0;height:38px;border:1px solid var(--line);border-radius:19px;padding:0 16px;background:#fff;outline:none}
+.srch:focus{border-color:var(--ink3)}
+.sel{flex:0 1 200px;min-width:0;height:38px;border:1px solid var(--line);border-radius:19px;padding:0 30px 0 14px;background:#fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%235E5D57' stroke-width='1.5'/%3E%3C/svg%3E") no-repeat right 12px center;appearance:none;-webkit-appearance:none;max-width:100%}
+.chips{display:flex;gap:6px;overflow-x:auto;scrollbar-width:none;flex:1 1 100%}
+.chips::-webkit-scrollbar{display:none}
+.chip{flex:none;height:32px;padding:0 14px;border-radius:16px;border:1px solid var(--line);background:#fff;cursor:pointer;font-size:13px;display:inline-flex;align-items:center;gap:6px;white-space:nowrap}
+.chip[aria-pressed=true]{background:var(--ink);color:#fff;border-color:var(--ink)}
+.chip .dot{width:8px;height:8px}
+.btn{height:38px;padding:0 16px;border-radius:19px;border:1px solid var(--ink);background:var(--ink);color:#fff;cursor:pointer;font-weight:600;font-size:13px;white-space:nowrap}
+.btn.line{background:#fff;color:var(--ink);border-color:var(--line)}
+.btn.line[aria-pressed=true]{border-color:var(--ink)}
+.count{font-size:12px;color:var(--ink2);margin-left:auto;white-space:nowrap}
+/* lista */
+main{max-width:1080px;margin:0 auto;padding:8px 16px 60px}
+.naz{margin:38px 0 6px;display:flex;align-items:baseline;gap:12px;border-bottom:1.5px solid var(--ink);padding-bottom:8px}
+.naz h2{font:500 italic 38px/1 var(--serif)}
+.naz span,.reg span{font-size:11px;letter-spacing:.24em;text-transform:uppercase;color:var(--ink3);font-weight:600}
+.reg{margin:26px 0 4px;display:flex;align-items:baseline;gap:10px}
+.reg h3{font:600 12px/1 var(--sans);letter-spacing:.26em;text-transform:uppercase;color:var(--bord)}
+.prod{margin-top:14px;padding:18px 0 4px;border-top:1px solid var(--line)}
+.ph{display:grid;grid-template-columns:1fr auto;gap:4px 16px;align-items:end}
+.ph h4{font:600 25px/1.05 var(--serif);letter-spacing:.005em}
+.ph .loc{font-size:12px;color:var(--ink2);margin-top:3px}
+.desc{grid-column:1/-1;margin-top:8px;color:#3E3D39;font-size:13.3px;line-height:1.55;max-width:78ch;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
+.desc.open{-webkit-line-clamp:unset;display:block}
+.more{grid-column:1/-1;justify-self:start;border:0;background:none;color:var(--bord);font-size:12.5px;font-weight:600;cursor:pointer;padding:4px 0}
+.w{display:grid;grid-template-columns:64px 1fr auto;gap:0 18px;padding:14px 0;border-bottom:1px solid var(--line);align-items:start}
+.w:last-child{border-bottom:0}.keep .w{border-bottom:1px solid var(--line)}.keep:last-child .w{border-bottom:0}
+.bt{height:150px;display:flex;align-items:flex-end;justify-content:center}
+.bt img{height:150px;width:auto;max-width:64px;object-fit:contain}
+.bt img.raw{height:auto;max-height:150px;border-radius:4px}
+.bt svg{height:120px;opacity:.28}
+.tp{display:flex;align-items:center;gap:7px;font-size:10.5px;letter-spacing:.2em;text-transform:uppercase;color:var(--ink2);font-weight:600}
+.dot{width:9px;height:9px;border-radius:50%;display:inline-block;flex:none}
+.wn{font:600 19px/1.12 var(--serif);margin-top:4px;letter-spacing:.01em}
+.wn em{font-weight:500;color:var(--bord)}
+.vit{margin-top:6px;font-size:13.5px;font-weight:500;border-left:2px solid var(--bord);padding-left:9px}
+.vd{font-size:12.5px;color:var(--ink2);padding-left:11px;margin-top:1px}
+.zn{font-size:12px;color:var(--ink3);margin-top:5px}
+.sch{margin-top:8px;display:grid;grid-template-columns:auto 1fr;gap:3px 12px;font-size:12.5px;color:#3E3D39;max-width:72ch}
+.sch dt{font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:var(--ink3);font-weight:600;padding-top:2px}
+.noschede .sch,.noschede .vd{display:none}
+.pz{text-align:right;min-width:112px;display:flex;flex-direction:column;align-items:flex-end;gap:6px}
+.pr{font:600 19px/1 var(--sans);font-variant-numeric:tabular-nums;white-space:nowrap}
+.pr s{display:block;font-size:12px;font-weight:500;color:var(--ink3);margin-bottom:3px}
+.fmt{font-size:12px;color:var(--ink2)}
+.bd{display:flex;flex-wrap:wrap;gap:4px;justify-content:flex-end;max-width:150px}
+.b{font-size:9.5px;letter-spacing:.1em;text-transform:uppercase;font-weight:700;padding:3px 8px;border-radius:10px;background:var(--fill);color:#44443F;white-space:nowrap}
+.b.as{background:var(--gold-t);color:var(--gold)}.b.ar{background:#E3EFFC;color:#0058B0}.b.li{background:#FFF0DC;color:#9A4A00}
+.b.es{background:#FCE6E4;color:#B3261E}.b.bio{background:#E3F4E7;color:#1F7A35}.b.mg{background:var(--ink);color:var(--cream)}
+.b.pn{background:#ECEBFB;color:#4B49B8}.b.pr{background:var(--bord);color:#fff}
+.empty{text-align:center;color:var(--ink2);padding:60px 0}
+.foot{background:var(--dark);color:#A9A49B;text-align:center;padding:34px 16px 44px;font-size:12px;line-height:1.7}
+.foot .logo{width:44px;margin:0 auto 10px;color:var(--cream)}
+.foot a{color:var(--cream)}
+.load{padding:80px 0;text-align:center;color:var(--ink2)}
+.printhead{display:none}
+@media (max-width:640px){
+  .top h1{font-size:34px}
+  .w{grid-template-columns:48px 1fr;gap:0 14px}
+  .bt,.bt img{height:118px}.bt img{max-width:48px}
+  .pz{grid-column:2;flex-direction:row;align-items:center;justify-content:space-between;text-align:left;margin-top:10px;min-width:0;flex-wrap:wrap}
+  .bd{justify-content:flex-start;max-width:none}
+  .sch{grid-template-columns:1fr}.sch dt{padding-top:4px}
+  .ph h4{font-size:22px}.naz h2{font-size:32px}
+  .count{display:none}
+  .bar{position:static}
+  .bar .in{gap:6px}
+  .srch{flex-basis:100%}.sel{flex:1 1 100%}#vai{display:none}.bar .btn{flex:1 1 40%}
+  .pz{justify-content:flex-start;gap:6px 12px}
+}
+/* stampa / PDF */
+@page{size:A4;margin:13mm 12mm 14mm}
+@media print{
+  body{background:#fff;font-size:9pt}
+  .bar,.more,.top .agg,.noprint{display:none!important}
+  .top{padding:0;background:#fff;color:var(--ink);text-align:left}
+  .top>*{display:none}
+  .printhead{display:flex;align-items:center;justify-content:space-between;border-bottom:1.5px solid var(--ink);padding-bottom:3mm;margin-bottom:2mm}
+  .printhead .l{display:flex;align-items:center;gap:3mm}.printhead .logo{width:16mm;color:var(--ink)}
+  .printhead .nm{font:700 9pt var(--sans);letter-spacing:.38em;text-transform:uppercase}
+  .printhead .r{text-align:right;font-size:7.5pt;color:var(--ink2);line-height:1.4}
+  .printhead .r b{font:500 italic 15pt var(--serif);color:var(--ink);display:block}
+  main{max-width:none;padding:0}
+  .naz{break-before:page;margin-top:0}.naz:first-of-type{break-before:auto;margin-top:4mm}
+  .naz h2{font-size:26pt}
+  .reg{break-after:avoid;margin-top:5mm}
+  .prod{break-inside:auto;margin-top:2mm;padding-top:3mm}
+  .ph{break-after:avoid}.keep{break-inside:avoid}.reg+.prod{break-before:auto}
+  .ph h4{font-size:15pt}
+  .desc{-webkit-line-clamp:unset;display:block;font-size:7.8pt;line-height:1.45;max-width:none;column-count:2;column-gap:7mm;color:#44433F}
+  .w{break-inside:avoid;grid-template-columns:11mm 1fr 30mm;gap:0 4.5mm;padding:2.6mm 0}
+  .bt,.bt img{height:33mm}.bt img{max-width:11mm}.bt svg{height:26mm}
+  .wn{font-size:11.5pt}.vit{font-size:8.4pt;margin-top:1.2mm}.vd,.zn{font-size:7.6pt}
+  .sch{font-size:7.6pt;gap:.5mm 3mm;margin-top:1.4mm;max-width:none}.sch dt{font-size:6.2pt}
+  .tp{font-size:6.4pt}.pr{font-size:11pt}.fmt{font-size:7.5pt}.b{font-size:5.8pt;padding:.5mm 1.6mm}
+  .pz{min-width:0}
+  .foot{background:#fff;color:var(--ink2);border-top:1px solid var(--line);margin-top:6mm;padding:5mm 0 0}
+  .foot .logo{color:var(--ink)}.foot a{color:var(--ink)}
+}
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
+  <symbol id="lg" viewBox="0 0 64 24"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2.2"/><circle cx="32" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2.2"/><path d="M32 3a9 9 0 0 0 0 18z" fill="currentColor"/><circle cx="52" cy="12" r="9" fill="currentColor"/></symbol>
+</defs></svg>
+
+<header class="top">
+  <svg class="logo" viewBox="0 0 64 24"><use href="#lg"/></svg>
+  <div class="nm">Wine Alchemist</div>
+  <h1>Listino vini</h1>
+  <div class="agg" id="agg">Caricamento…</div>
+  <div class="printhead"><div class="l"><svg class="logo" viewBox="0 0 64 24"><use href="#lg"/></svg><span class="nm">Wine Alchemist</span></div>
+    <div class="r"><b>Listino vini</b><span id="aggp"></span></div></div>
+</header>
+
+<nav class="bar" aria-label="Filtri">
+  <div class="in">
+    <input class="srch" id="q" type="search" placeholder="Cerca vino, produttore, vitigno, zona…" autocomplete="off">
+    <select class="sel" id="zona" aria-label="Zona"><option value="">Tutte le zone</option></select>
+    <select class="sel" id="vai" aria-label="Vai al produttore"><option value="">Produttori</option></select>
+    <button class="btn line" id="sch" aria-pressed="true" title="Mostra o nascondi terreni, vinificazione e affinamento">Schede tecniche</button>
+    <button class="btn" id="pdf">Scarica PDF</button>
+    <div class="chips" id="tipi"></div>
+  </div>
+</nav>
+
+<main id="list"><div class="load">Caricamento del listino…</div></main>
+
+<footer class="foot">
+  <svg class="logo" viewBox="0 0 64 24"><use href="#lg"/></svg>
+  <div>Wine Alchemist · Distribuzione vini italiani ed esteri</div>
+  <div><a href="mailto:info@winealchemist.it">info@winealchemist.it</a></div>
+  <div style="margin-top:8px">Prezzi di listino e disponibilità aggiornati in tempo reale dal magazzino.<br>Le foto delle bottiglie sono a titolo rappresentativo.</div>
+</footer>
+
+<script>
+(() => {
+const CFG = {
+  url: 'https://xnzqutbfmaofvsurmkxf.supabase.co',
+  key: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhuenF1dGJmbWFvZnZzdXJta3hmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODk3MjcxNzUsImV4cCI6MjEwNTMwMzE3NX0.mUJ5g-6QNLTnk5hCfHPjwTN45unJauaZOg2Pg_AIkkA'
+};
+const NAZ = ['Italia', 'Francia', 'Germania', 'Spagna'];
+const REG = ['Lombardia','Trentino-Alto Adige','Veneto','Piemonte','Toscana','Marche','Champagne','Jura','Borgogna','Beaujolais','Bugey','Savoia','Ardèche','Rodano','Bordeaux','Loira','Languedoc','Roussillon','Baden','Franconia','Galizia','Spagna'];
+const TIP = ['bollicine','champagne','rifermentato','bianco','macerato','rosato','rosso'];
+const TCOL = {bollicine:'#C9A64B',champagne:'#B8964A',rifermentato:'#9DB07A',bianco:'#D9C27A',macerato:'#D08A3C',rosato:'#D98C8C',rosso:'#7A1F2B'};
+const GRUPPI = [['', 'Tutti'], ['bollicine,champagne,rifermentato', 'Bollicine'], ['bianco', 'Bianchi'], ['macerato', 'Macerati'], ['rosato', 'Rosati'], ['rosso', 'Rossi']];
+const DISP = {assegnazione:['as','Assegnazione'], in_arrivo:['ar','In arrivo'], limitato:['li','Quantità limitata'], in_esaurimento:['es','In esaurimento'], su_prenotazione:['pn','Su prenotazione']};
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const eur = n => '€ ' + Number(n).toLocaleString('it-IT', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+const norm = s => String(s ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+const nomeProd = p => p.replace(/\s*\(SELEZIONE\)/i, ' — Selezione');
+const idx = (arr, v) => { const i = arr.indexOf(v); return i < 0 ? 999 : i; };
+const imgUrl = u => !u ? '' : /^https?:/.test(u) ? u : '../' + u;
+const bottiglia = t => `<svg viewBox="0 0 24 64" aria-hidden="true"><path fill="${TCOL[t] || '#999'}" d="M9 2h6v14c0 3 5 6 5 12v32a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V28c0-6 5-9 5-12z"/></svg>`;
+const LS = k => { try { return localStorage.getItem(k); } catch { return null; } };
+const LSset = (k, v) => { try { localStorage.setItem(k, v); } catch {} };
+
+const st = { q: '', tipi: '', zona: '', schede: LS('wa_schede') !== '0' };
+let DATA = null, SCH = { produttori: {}, vini: {} }, AGG = null, OFFLINE = false;
+
+async function carica() {
+  const [dati, schede] = await Promise.allSettled([
+    fetch(CFG.url + '/rest/v1/rpc/listino_wa', { method: 'POST', cache: 'no-store',
+      headers: { apikey: CFG.key, Authorization: 'Bearer ' + CFG.key, 'Content-Type': 'application/json' }, body: '{}' })
+      .then(r => { if (!r.ok) throw new Error(r.status); return r.json(); }),
+    fetch('schede.json').then(r => r.json())
+  ]);
+  if (schede.status === 'fulfilled') SCH = schede.value;
+  if (dati.status === 'fulfilled') {
+    DATA = dati.value; OFFLINE = false; LSset('wa_listino', JSON.stringify(DATA));
+  } else {
+    const c = LS('wa_listino');
+    if (c && !DATA) { DATA = JSON.parse(c); OFFLINE = true; }
+    else if (!DATA) { $('#list').innerHTML = '<div class="empty">Listino non raggiungibile. Riprova tra qualche istante.</div>'; return; }
+  }
+  AGG = new Date(DATA.aggiornato);
+  const d = AGG.toLocaleDateString('it-IT', { day: 'numeric', month: 'long', year: 'numeric' }) + ' · ' + AGG.toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' });
+  $('#agg').innerHTML = (OFFLINE ? 'Offline · ultima copia del ' : 'Aggiornato in tempo reale · ') + '<b>' + d + '</b>';
+  $('#agg').classList.toggle('old', OFFLINE);
+  $('#aggp').textContent = 'Aggiornato al ' + d;
+  prepara(); disegna();
+}
+
+function prepara() {
+  const vini = DATA.vini.map(w => ({ ...w, x: SCH.vini[w.id] || {} }));
+  vini.forEach(w => { w._q = norm([w.p, w.n, w.a, w.v, w.r, w.z, w.naz, w.t].join(' ')); });
+  vini.sort((a, b) => idx(NAZ, a.naz) - idx(NAZ, b.naz) || (a.naz || '').localeCompare(b.naz || '')
+    || idx(REG, a.r) - idx(REG, b.r) || (a.r || '').localeCompare(b.r || '', 'it')
+    || nomeProd(a.p).localeCompare(nomeProd(b.p), 'it') || idx(TIP, a.t) - idx(TIP, b.t)
+    || a.n.localeCompare(b.n, 'it') || (a.f || 0) - (b.f || 0) || String(a.a).localeCompare(String(b.a)));
+  DATA._v = vini;
+  const zone = {}; vini.forEach(w => (zone[w.naz] ||= new Set()).add(w.r));
+  $('#zona').innerHTML = '<option value="">Tutte le zone</option>' + Object.keys(zone).map(n =>
+    `<optgroup label="${esc(n)}"><option value="N|${esc(n)}">Tutta ${esc(n)}</option>${[...zone[n]].map(r => `<option value="R|${esc(n)}|${esc(r)}">${esc(r)}</option>`).join('')}</optgroup>`).join('');
+  $('#zona').value = st.zona;
+  $('#tipi').innerHTML = GRUPPI.map(([k, l]) => `<button class="chip" data-t="${k}" aria-pressed="${st.tipi === k}">${k ? `<i class="dot" style="background:${TCOL[k.split(',')[0]]}"></i>` : ''}${l}</button>`).join('')
+    + '<span class="count" id="cnt"></span>';
+}
+
+function badge(w) {
+  const b = [];
+  if (DISP[w.d]) b.push(`<span class="b ${DISP[w.d][0]}">${DISP[w.d][1]}</span>`);
+  if (w.ult) b.push('<span class="b es">Ultime bottiglie</span>');
+  if (w.promo) b.push(`<span class="b pr">Promo −${Number(w.promo)}%</span>`);
+  if ((w.st || []).includes('biologico')) b.push('<span class="b bio">Bio</span>');
+  if (w.f >= 150) b.push('<span class="b mg">Magnum</span>');
+  if (w.max) b.push(`<span class="b">Max ${w.max} per cliente</span>`);
+  return b.join('');
+}
+
+function riga(w) {
+  const x = w.x, an = !w.a ? '' : /^(sa|nv)$/i.test(w.a) ? 's.a.' : w.a;
+  const img = x.img ? `<img src="${x.img}" alt="" loading="lazy" decoding="async">`
+    : w.img ? `<img class="raw" src="${esc(imgUrl(w.img))}" alt="" loading="lazy" decoding="async" onerror="this.outerHTML=''">` : bottiglia(w.t);
+  const zona = [w.z, w.r].filter((v, i, a) => v && a.indexOf(v) === i && v !== w.naz).join(' · ');
+  const sch = (x.s || []).map(([k, v]) => `<dt>${esc(k)}</dt><dd>${esc(v)}</dd>`).join('');
+  const prezzo = w.promo ? `<s>${eur(w.pr)}</s>${eur(w.pr * (1 - w.promo / 100))}` : eur(w.pr);
+  return `<article class="w"><div class="bt">${img || bottiglia(w.t)}</div>
+    <div><div class="tp"><i class="dot" style="background:${TCOL[w.t] || '#999'}"></i>${esc(w.t)}${w.l ? ' · ' + esc(w.l) : ''}</div>
+      <div class="wn">${esc(w.n)}${an ? ` <em>${esc(an)}</em>` : ''}</div>
+      ${w.v ? `<div class="vit">${esc(w.v)}</div>` : ''}${x.vd ? `<div class="vd">${esc(x.vd)}</div>` : ''}
+      ${zona ? `<div class="zn">${esc(zona)}</div>` : ''}
+      ${sch ? `<dl class="sch">${sch}</dl>` : ''}</div>
+    <div class="pz"><div class="pr">${prezzo}</div><div class="fmt">${w.f} cl</div><div class="bd">${badge(w)}</div></div></article>`;
+}
+
+function disegna() {
+  if (!DATA) return;
+  const q = norm(st.q).trim().split(/\s+/).filter(Boolean), T = st.tipi ? st.tipi.split(',') : null;
+  const [zt, zn, zr] = st.zona.split('|');
+  const L = DATA._v.filter(w => (!T || T.includes(w.t)) && (!zt || w.naz === zn && (zt === 'N' || w.r === zr)) && q.every(t => w._q.includes(t)));
+  $('#cnt').textContent = L.length + (L.length === 1 ? ' referenza' : ' referenze');
+  document.body.classList.toggle('noschede', !st.schede);
+  $('#sch').setAttribute('aria-pressed', st.schede);
+  if (!L.length) { $('#list').innerHTML = '<div class="empty">Nessun vino corrisponde alla ricerca.</div>'; $('#vai').innerHTML = '<option value="">Produttori</option>'; return; }
+  let h = '', naz, reg, prod, n = 0; const prods = [];
+  for (const w of L) {
+    if (w.naz !== naz) { if (prod) h += '</section>'; prod = reg = null; naz = w.naz;
+      const c = L.filter(v => v.naz === naz).length; h += `<div class="naz"><h2>${esc(naz)}</h2><span>${c} referenz${c === 1 ? 'a' : 'e'}</span></div>`; }
+    if (w.r !== reg) { if (prod) h += '</section>'; prod = null; reg = w.r; h += `<div class="reg"><h3>${esc(reg || '—')}</h3></div>`; }
+    if (w.p !== prod) {
+      if (prod) h += '</section>';
+      prod = w.p; const P = SCH.produttori[w.p] || {}, id = 'p' + (++n);
+      prods.push([id, nomeProd(w.p)]);
+      const loc = [P.loc, w.r].filter((v, i, a) => v && a.indexOf(v) === i).join(' · ');
+      h += `<section class="prod" id="${id}"><div class="keep"><div class="ph"><div><h4>${esc(nomeProd(w.p))}</h4>${loc ? `<div class="loc">${esc(loc)}</div>` : ''}</div>
+        ${P.desc ? `<p class="desc">${esc(P.desc)}</p><button class="more">Leggi tutto</button>` : ''}</div>` + riga(w) + '</div>';
+      continue;
+    }
+    h += riga(w);
+  }
+  $('#list').innerHTML = h + '</section>';
+  $('#vai').innerHTML = '<option value="">Produttori</option>' + prods.sort((a, b) => a[1].localeCompare(b[1], 'it')).map(([id, p]) => `<option value="${id}">${esc(p)}</option>`).join('');
+  document.querySelectorAll('.desc').forEach(d => { if (d.scrollHeight <= d.clientHeight + 2) d.nextElementSibling.remove(); });
+}
+
+let tq;
+$('#q').addEventListener('input', e => { clearTimeout(tq); tq = setTimeout(() => { st.q = e.target.value; disegna(); }, 120); });
+$('#zona').addEventListener('change', e => { st.zona = e.target.value; disegna(); });
+$('#vai').addEventListener('change', e => { const el = document.getElementById(e.target.value); if (el) scrollTo({ top: el.getBoundingClientRect().top + scrollY - $('.bar').offsetHeight - 8, behavior: 'smooth' }); e.target.value = ''; });
+$('#tipi').addEventListener('click', e => { const b = e.target.closest('.chip'); if (!b) return; st.tipi = b.dataset.t;
+  document.querySelectorAll('.chip').forEach(c => c.setAttribute('aria-pressed', c === b)); disegna(); });
+$('#sch').addEventListener('click', () => { st.schede = !st.schede; LSset('wa_schede', st.schede ? '1' : '0'); disegna(); });
+$('#list').addEventListener('click', e => { const b = e.target.closest('.more'); if (!b) return; const d = b.previousElementSibling; d.classList.toggle('open'); b.textContent = d.classList.contains('open') ? 'Riduci' : 'Leggi tutto'; });
+$('#pdf').addEventListener('click', () => window.print());
+document.addEventListener('visibilitychange', () => { if (!document.hidden && AGG && Date.now() - AGG > 5 * 60e3) carica(); });
+setInterval(() => { if (!document.hidden) carica(); }, 10 * 60e3);
+carica();
+})();
+</script>
+</body>
+</html>
