@@ -368,8 +368,23 @@ section.flash>.inset{animation:flash 1.3s ease}
 .cart-opts .num-in{width:52px;min-height:30px;font-size:13px}
 .bar.acts .btn{display:inline-flex;align-items:center;justify-content:center}
 #tabbar{grid-template-columns:repeat(6,1fr)}
+/* grafico fatturato mensile (Analisi) */
+.mchart{display:flex;align-items:stretch;height:190px}
+.mcol{flex:1;min-width:0;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;gap:5px}
+.mcol i{display:block;width:calc(100% - 6px);max-width:40px;border-radius:6px 6px 0 0;background:color-mix(in srgb,var(--fg) 22%,transparent);transition:background .15s}
+.mcol:hover i{background:color-mix(in srgb,var(--fg) 40%,transparent)}
+.mcol.cur i{background:#7A1F2B}
+:root[data-theme=dark] .mcol.cur i{background:#C9536A}
+@media (prefers-color-scheme:dark){:root:not([data-theme=light]) .mcol.cur i{background:#C9536A}}
+.mcol .mv{font-size:10.5px;font-weight:600;color:var(--fg2);white-space:nowrap}
+.mcol .ml{align-self:stretch;margin-top:-5px;padding-top:5px;border-top:1px solid var(--sep);text-align:center;font-size:10.5px;color:var(--fg3)}
+.mcol.cur .ml{color:var(--fg);font-weight:600}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.row input:focus-visible,.row select:focus-visible,.row textarea:focus-visible,.search input:focus-visible{outline:none}
 @media (max-width:719px){
-  .bar.acts{flex-wrap:nowrap}
+  .bar.acts{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;margin-left:-16px;margin-right:-16px;padding:2px 16px}
+  .bar.acts::-webkit-scrollbar{display:none}
+  .mcol .mv{font-size:9px}
   .bar.acts>*{flex-shrink:0}
   .seg button{font-size:12px}
   .tags{flex-direction:column;align-items:flex-end;gap:4px}
@@ -415,7 +430,7 @@ if ('serviceWorker' in navigator) addEventListener('load', () => navigator.servi
 <script src="crm_map.js?v=8"></script>
 <script src="crm_insights.js?v=9"></script>
 <script src="crm_client_form.js?v=9"></script>
-<script src="crm.js?v=49"></script>
+<script src="crm.js?v=50"></script>
 <script>
 // Diagnostica: se dopo 9 secondi l'app non è partita, dice cosa manca invece di girare a vuoto.
 (function () {

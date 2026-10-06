@@ -2109,8 +2109,14 @@ addRoute('analisi', async () => {
     f: a.f + num(t.fatturato), o: a.o + num(t.ordini), b: a.b + num(t.bottiglie)
   }), { f: 0, o: 0, b: 0 });
   const clienti = new Set((perZona || []).map(z => z.chiave)).size;
-  const max = Math.max(1, ...(trend || []).map(t => num(t.fatturato)));
   const MESI = ['gen', 'feb', 'mar', 'apr', 'mag', 'giu', 'lug', 'ago', 'set', 'ott', 'nov', 'dic'];
+  const serie = [...Array(mesi + 1)].map((_, i) => {   // tutti i mesi del periodo, anche quelli a zero
+    const d = new Date(da.getFullYear(), da.getMonth() + i, 1);
+    const r = (trend || []).find(x => { const p = new Date(x.periodo); return p.getFullYear() === d.getFullYear() && p.getMonth() === d.getMonth(); });
+    return { d, v: num(r?.fatturato), o: num(r?.ordini), cur: i === mesi };
+  });
+  const max = Math.max(1, ...serie.map(m => m.v));
+  const kEur = v => v >= 1000 ? (v / 1000).toLocaleString('it-IT', { maximumFractionDigits: 1 }) + 'k' : Math.round(v) + '';
 
   const classifica = (titolo, arr, unita = 'bt') => `<div class="group"><h3>${titolo}</h3><div class="inset">
     ${(arr || []).map((r, i) => `<div class="row">
@@ -2136,16 +2142,12 @@ addRoute('analisi', async () => {
     </div>
     <div class="card" style="margin-top:14px">
       <h3 style="margin-bottom:12px">Fatturato per mese</h3>
-      <div style="display:flex;align-items:flex-end;gap:6px;height:170px;border-bottom:1px solid var(--sep)">
-        ${(trend || []).map(t => {
-          const d = new Date(t.periodo);
-          return `<div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;gap:4px;height:100%">
-            <span class="sub mono" style="font-size:10px">${Math.round(num(t.fatturato) / 100) / 10}k</span>
-            <div style="width:100%;max-width:38px;height:${Math.round(num(t.fatturato) / max * 130)}px;
-              background:var(--accent);opacity:${d.getMonth() === oggi.getMonth() ? 1 : .45};border-radius:6px 6px 0 0"></div>
-            <span class="sub" style="font-size:10px">${MESI[d.getMonth()]}</span></div>`;
-        }).join('') || '<div class="empty" style="flex:1">Nessuna vendita nel periodo.</div>'}
-      </div>
+      <div class="mchart">${serie.some(m => m.v) ? serie.map(m =>
+        `<div class="mcol${m.cur ? ' cur' : ''}" title="${MESI[m.d.getMonth()]} ${m.d.getFullYear()}: ${eur(m.v)} · ${m.o} ordini">
+          <span class="mv mono">${m.v ? kEur(m.v) : ''}</span>
+          <i style="height:${m.v ? Math.max(3, Math.round(m.v / max * 140)) : 0}px"></i>
+          <span class="ml">${MESI[m.d.getMonth()]}</span></div>`).join('')
+        : '<div class="empty" style="flex:1;align-self:center">Nessuna vendita nel periodo.</div>'}</div>
     </div>
     ${classifica('Referenze più vendute', top)}
     ${classifica('Per agente', perAgente)}
