@@ -382,14 +382,23 @@ function winesLive() {
   document.addEventListener('visibilitychange', () => { if (!document.hidden) winesRefresh(); });
 }
 
-/* Nuova versione pubblicata: confronta ETag/contenuto di index.html e degli script locali */
+/* Nuova versione pubblicata: hash del contenuto di index.html e degli script locali.
+   L'ETag di Pages cambia a ogni deploy del repo (anche solo listino/foto): serve solo a evitare download inutili. */
+const verCache = {};
 async function firmaVersione() {
   const files = ['index.html', ...[...document.querySelectorAll('script[src]')].map(s => s.getAttribute('src'))
     .filter(u => !/^(https?:)?\/\//.test(u)).map(u => u.split('?')[0])];
   const parti = await Promise.all(files.map(async f => {
+    const h = await fetch(f + '?_=' + Date.now(), { method: 'HEAD', cache: 'no-store' });
+    if (!h.ok) throw new Error(f + ' ' + h.status);
+    const tag = h.headers.get('etag') || h.headers.get('last-modified');
+    if (tag && verCache[f]?.tag === tag) return verCache[f].hash;
     const r = await fetch(f + '?_=' + Date.now(), { cache: 'no-store' });
     if (!r.ok) throw new Error(f + ' ' + r.status);
-    return f + ':' + (r.headers.get('etag') || r.headers.get('last-modified') || (await r.text()).length);
+    const buf = await crypto.subtle.digest('SHA-1', await r.arrayBuffer());
+    const hash = f + ':' + [...new Uint8Array(buf)].map(b => b.toString(16).padStart(2, '0')).join('');
+    verCache[f] = { tag, hash };
+    return hash;
   }));
   return parti.join('|');
 }
