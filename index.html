@@ -380,6 +380,12 @@ section.flash>.inset{animation:flash 1.3s ease}
 .mcol .ml{align-self:stretch;margin-top:-5px;padding-top:5px;border-top:1px solid var(--sep);text-align:center;font-size:10.5px;color:var(--fg3)}
 .mcol.cur .ml{color:var(--fg);font-weight:600}
 :focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.rk-v{display:flex;flex-direction:column;align-items:flex-end;flex-shrink:0;line-height:1.25}
+.rk-v .sub{font-size:12px}
+#tabbar a span{white-space:nowrap;letter-spacing:-.01em}
+#tabbar.t7 a{font-size:9.5px}#tabbar.t7 a svg{width:23px;height:23px}
+.rk-p{display:block;font-size:11px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--fg2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.rk-n{display:block;font-size:15px}
 .row input:focus-visible,.row select:focus-visible,.row textarea:focus-visible,.search input:focus-visible{outline:none}
 @media (max-width:719px){
   .bar.acts{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;margin-left:-16px;margin-right:-16px;padding:2px 16px}
@@ -430,7 +436,7 @@ if ('serviceWorker' in navigator) addEventListener('load', () => navigator.servi
 <script src="crm_map.js?v=8"></script>
 <script src="crm_insights.js?v=9"></script>
 <script src="crm_client_form.js?v=9"></script>
-<script src="crm.js?v=50"></script>
+<script src="crm.js?v=51"></script>
 <script>
 // Diagnostica: se dopo 9 secondi l'app non è partita, dice cosa manca invece di girare a vuoto.
 (function () {

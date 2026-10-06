@@ -176,7 +176,7 @@ function renderShell() {
       </div>
     </aside>
     <main id="main"></main>
-    <nav id="tabbar">${NAV.filter(n => n[0] !== 'provvigioni').map(([k, l, h]) =>
+    <nav id="tabbar" class="${vedeProv() ? 't7' : ''}" style="grid-template-columns:repeat(${vedeProv() ? 7 : 6},1fr)">${NAV.filter(n => n[0] !== 'provvigioni' || vedeProv()).map(([k, l, h]) =>
       `<a href="${h}" data-nav="${k}">${svg(k, 25)}<span>${l}</span></a>`).join('')}</nav>
   </div>`;
   document.addEventListener('click', e => { if (e.target.id === 'out2') $('#out').click(); });
@@ -2118,12 +2118,14 @@ addRoute('analisi', async () => {
   const max = Math.max(1, ...serie.map(m => m.v));
   const kEur = v => v >= 1000 ? (v / 1000).toLocaleString('it-IT', { maximumFractionDigits: 1 }) + 'k' : Math.round(v) + '';
 
+  const rkLabel = l => { const i = String(l).indexOf(' · ');   // referenze: produttore sopra, vino sotto
+    return i > 0 ? `<span class="rk-p">${esc(l.slice(0, i))}</span><span class="ttl rk-n">${esc(l.slice(i + 3))}</span>`
+      : `<span class="ttl" style="font-size:15px">${esc(l)}</span>`; };
   const classifica = (titolo, arr, unita = 'bt') => `<div class="group"><h3>${titolo}</h3><div class="inset">
     ${(arr || []).map((r, i) => `<div class="row">
       <span class="sub" style="width:18px">${i + 1}</span>
-      <span style="flex:1;min-width:0"><span class="ttl" style="font-size:15px">${esc(r.label || r.chiave)}</span></span>
-      <span class="sub mono">${r.bottiglie} ${unita}</span>
-      <span class="mono" style="font-weight:600">${eur(r.fatturato)}</span></div>`).join('')
+      <span style="flex:1;min-width:0">${rkLabel(r.label || r.chiave)}</span>
+      <span class="rk-v"><span class="mono" style="font-weight:600">${eur(r.fatturato)}</span><span class="sub mono">${r.bottiglie} ${unita}</span></span></div>`).join('')
       || '<div class="empty">Nessun dato nel periodo.</div>'}</div></div>`;
 
   paint(`<div class="bar"><h1>Analisi</h1></div>
