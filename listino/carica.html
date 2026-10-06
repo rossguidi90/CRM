@@ -1,0 +1,208 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<title>Wine Alchemist · Aggiorna listino</title>
+<link rel="icon" href="../favicon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Darker+Grotesque:wght@500;600;700&family=Open+Sans:wght@300;400&display=swap" rel="stylesheet">
+<style>
+:root{--ink:#1D1D1B;--ink2:#55534E;--ink3:#8E8B84;--line:#E6E3DD;--fill:#F3F1EC;--ok:#1F7A35;--ko:#B3261E;
+  --gro:"Darker Grotesque",system-ui,sans-serif;--os:"Open Sans",system-ui,sans-serif}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font:500 17px/1.35 var(--gro);color:var(--ink);background:#fff}
+button,input{font:inherit;color:inherit}
+.top{background:#000;color:#fff;text-align:center;padding:30px 16px 26px}
+.top .nm{font:700 30px/1 var(--gro);letter-spacing:.06em;text-transform:uppercase}
+.top h1{font:700 18px/1 var(--gro);letter-spacing:.42em;margin:18px -.42em 0 0;text-transform:uppercase}
+main{max-width:920px;margin:0 auto;padding:28px 16px 80px}
+h2{font:300 22px/1.2 var(--os);letter-spacing:.24em;text-transform:uppercase;margin:0 0 14px}
+.card{border:1px solid var(--line);border-radius:14px;padding:22px;margin-bottom:22px}
+label{display:block;font:600 14px var(--gro);letter-spacing:.08em;text-transform:uppercase;color:var(--ink2);margin:12px 0 5px}
+input[type=email],input[type=password]{width:100%;height:44px;border:1px solid var(--line);border-radius:10px;padding:0 14px;font-size:17px}
+.btn{height:44px;padding:0 22px;border-radius:22px;border:1px solid var(--ink);background:var(--ink);color:#fff;cursor:pointer;font:700 15px var(--gro);letter-spacing:.1em;text-transform:uppercase}
+.btn.line{background:#fff;color:var(--ink)}
+.btn:disabled{opacity:.4;cursor:default}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-top:16px}
+.drop{border:1.5px dashed var(--ink3);border-radius:14px;padding:34px 16px;text-align:center;cursor:pointer;color:var(--ink2)}
+.drop.over{background:var(--fill);border-color:var(--ink)}
+.drop b{color:var(--ink)}
+.note{font-size:15px;color:var(--ink2);margin-top:10px}
+.msg{margin-top:12px;font-weight:600}.msg.ko{color:var(--ko)}.msg.ok{color:var(--ok)}
+table{width:100%;border-collapse:collapse;font-size:15.5px;margin-top:12px}
+th{font:400 11px var(--os);letter-spacing:.18em;text-transform:uppercase;color:var(--ink3);text-align:left;padding:0 8px 6px 0;border-bottom:1px solid var(--ink)}
+td{padding:7px 8px 7px 0;border-bottom:1px solid var(--line);vertical-align:top}
+td small{display:block;color:var(--ink2)}
+.old{color:var(--ink3);text-decoration:line-through;margin-right:6px}
+.new{font-weight:700}
+.tag{display:inline-block;font:700 11px var(--gro);letter-spacing:.1em;text-transform:uppercase;padding:3px 8px;border-radius:9px;background:var(--fill)}
+.sum{display:flex;gap:18px;flex-wrap:wrap;margin-top:6px;font-size:16px}
+.sum b{font-size:20px}
+.chk{display:flex;gap:8px;align-items:flex-start;margin-top:14px;font-size:16px;text-transform:none;letter-spacing:0;color:var(--ink);font-weight:500}
+.chk input{margin-top:4px}
+.hide{display:none}
+code{font-size:14px;background:var(--fill);padding:1px 5px;border-radius:5px}
+a{color:var(--ink)}
+</style>
+</head>
+<body>
+<header class="top"><div class="nm">Wine Alchemist</div><h1>Aggiorna listino</h1></header>
+<main>
+  <section class="card" id="login">
+    <h2>Accesso riservato</h2>
+    <p class="note">Area riservata a Wine Alchemist. Usa le credenziali del CRM.</p>
+    <form id="fl">
+      <label for="em">Email</label><input id="em" type="email" autocomplete="username" required>
+      <label for="pw">Password</label><input id="pw" type="password" autocomplete="current-password" required>
+      <div class="row"><button class="btn" type="submit">Entra</button></div>
+      <div class="msg ko" id="lerr"></div>
+    </form>
+  </section>
+
+  <section class="hide" id="app">
+    <div class="card">
+      <h2>Carica disponibilità</h2>
+      <div class="drop" id="drop"><b>Trascina qui il file CSV</b><br>oppure tocca per sceglierlo
+        <input type="file" id="file" accept=".csv,text/csv,text/plain" class="hide"></div>
+      <p class="note">Colonne riconosciute (separatore <code>;</code> o <code>,</code>): <code>codice</code> obbligatoria, poi una o più tra
+        <code>disponibilita</code>, <code>giacenza</code>, <code>prezzo_listino</code>. Va bene anche il CSV completo del catalogo del CRM.
+        Valori ammessi per la disponibilità: disponibile, limitato, in esaurimento, assegnazione, su prenotazione, in arrivo, esaurito.</p>
+      <label class="chk"><input type="checkbox" id="assenti"> Segna come <b>&nbsp;esaurite&nbsp;</b> le referenze in listino che non compaiono nel file</label>
+      <div class="msg" id="fmsg"></div>
+    </div>
+
+    <div class="card hide" id="prev">
+      <h2>Anteprima</h2>
+      <div class="sum" id="sum"></div>
+      <div id="tab"></div>
+      <div class="row"><button class="btn" id="pub">Pubblica sul listino</button><button class="btn line" id="ann">Annulla</button></div>
+      <div class="msg" id="pmsg"></div>
+    </div>
+
+    <div class="row"><a href="./" target="_blank">Apri il listino pubblico ↗</a><span style="flex:1"></span><button class="btn line" id="out">Esci</button></div>
+  </section>
+</main>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script>
+(() => {
+const URL_ = 'https://xnzqutbfmaofvsurmkxf.supabase.co';
+const KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhuenF1dGJmbWFvZnZzdXJta3hmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODk3MjcxNzUsImV4cCI6MjEwNTMwMzE3NX0.mUJ5g-6QNLTnk5hCfHPjwTN45unJauaZOg2Pg_AIkkA';
+const sb = supabase.createClient(URL_, KEY, { auth: { persistSession: true, autoRefreshToken: true } });
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const eur = n => n == null ? '—' : '€ ' + Number(n).toLocaleString('it-IT', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const DISP = { disponibile: 'disponibile', limitato: 'limitato', 'quantita limitata': 'limitato', 'in esaurimento': 'in_esaurimento',
+  assegnazione: 'assegnazione', 'su prenotazione': 'su_prenotazione', 'in arrivo': 'in_arrivo', esaurito: 'esaurito', 'non disponibile': 'esaurito' };
+const LBL = { disponibile: 'Disponibile', limitato: 'Limitato', in_esaurimento: 'In esaurimento', assegnazione: 'Assegnazione',
+  su_prenotazione: 'Su prenotazione', in_arrivo: 'In arrivo', esaurito: 'Esaurito' };
+const norm = s => String(s ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[_\s]+/g, ' ').trim();
+let RIGHE = null, NOME = '';
+
+function parseCSV(txt) {
+  txt = txt.replace(/^\uFEFF/, '');
+  const first = txt.split('\n')[0];
+  const sep = (first.match(/;/g) || []).length >= (first.match(/,/g) || []).length ? ';' : ',';
+  const out = []; let row = [], v = '', q = false;
+  for (let i = 0; i < txt.length; i++) {
+    const c = txt[i];
+    if (q) { if (c === '"') { if (txt[i + 1] === '"') { v += '"'; i++; } else q = false; } else v += c; }
+    else if (c === '"') q = true;
+    else if (c === sep) { row.push(v); v = ''; }
+    else if (c === '\n') { row.push(v); out.push(row); row = []; v = ''; }
+    else if (c !== '\r') v += c;
+  }
+  if (v || row.length) { row.push(v); out.push(row); }
+  return out.filter(r => r.some(x => x.trim() !== ''));
+}
+const num = s => { s = String(s ?? '').replace(/[€\s]/g, ''); if (!s) return null;
+  if (s.includes(',')) s = s.replace(/\./g, '').replace(',', '.'); const n = Number(s); return isFinite(n) ? n : NaN; };
+
+function leggi(txt) {
+  const [head, ...rows] = parseCSV(txt);
+  if (!head) throw new Error('Il file è vuoto.');
+  const H = head.map(norm), col = (...n) => H.findIndex(h => n.includes(h));
+  const iC = col('codice', 'codice articolo', 'cod', 'sku'), iD = col('disponibilita', 'stato', 'disponibilita listino'),
+    iG = col('giacenza', 'quantita', 'qta', 'qty', 'stock', 'bottiglie'), iP = col('prezzo listino', 'prezzo', 'listino');
+  if (iC < 0) throw new Error('Manca la colonna "codice".');
+  if (iD < 0 && iG < 0 && iP < 0) throw new Error('Il file deve avere almeno una colonna tra disponibilita, giacenza e prezzo_listino.');
+  const errori = [], righe = [];
+  rows.forEach((r, k) => {
+    const codice = (r[iC] || '').trim(); if (!codice) return;
+    const o = { codice };
+    if (iD >= 0 && (r[iD] || '').trim()) { const d = DISP[norm(r[iD])]; if (!d) errori.push(`Riga ${k + 2}: disponibilità "${r[iD]}" non riconosciuta`); else o.disponibilita = d; }
+    if (iG >= 0 && (r[iG] || '').trim() !== '') { const g = num(r[iG]); if (!Number.isInteger(g) || g < 0) errori.push(`Riga ${k + 2}: giacenza "${r[iG]}" non valida`); else o.giacenza = g; }
+    if (iP >= 0 && (r[iP] || '').trim()) { const p = num(r[iP]); if (!(p > 0)) errori.push(`Riga ${k + 2}: prezzo "${r[iP]}" non valido`); else o.prezzo = p; }
+    righe.push(o);
+  });
+  if (errori.length) throw new Error(errori.slice(0, 8).join(' · ') + (errori.length > 8 ? ` · e altri ${errori.length - 8} errori` : ''));
+  if (!righe.length) throw new Error('Nessuna riga con codice nel file.');
+  return righe;
+}
+
+async function rpc(applica) {
+  const { data, error } = await sb.rpc('listino_carica', { righe: RIGHE, applica, file: NOME, azzera_assenti: $('#assenti').checked });
+  if (error) throw new Error(error.message);
+  return data;
+}
+
+function anteprima(r) {
+  const m = r.modifiche || [];
+  $('#sum').innerHTML = `<span><b>${m.length}</b> referenze cambiano</span><span><b>${r.invariate || 0}</b> invariate</span>`
+    + (r.non_trovati?.length ? `<span><b>${r.non_trovati.length}</b> codici non trovati</span>` : '');
+  const cella = (a, b, f) => a === b || b === undefined || b === null ? esc(f(a)) : `<span class="old">${esc(f(a))}</span><span class="new">${esc(f(b))}</span>`;
+  $('#tab').innerHTML = (m.length ? `<table><thead><tr><th>Vino</th><th>Disponibilità</th><th>Giacenza</th><th>Prezzo</th></tr></thead><tbody>${m.map(x => `<tr>
+      <td>${esc(x.nome)}${x.annata ? ' ' + esc(x.annata) : ''}<small>${esc(x.produttore)} · ${esc(x.codice)}</small></td>
+      <td>${cella(x.prima.disponibilita, x.dopo.disponibilita, v => LBL[v] || v)}</td>
+      <td>${cella(x.prima.giacenza, x.dopo.giacenza, v => v ?? '—')}</td>
+      <td>${cella(x.prima.prezzo, x.dopo.prezzo, eur)}</td></tr>`).join('')}</tbody></table>` : '<p class="note">Nessuna modifica rispetto ai dati attuali.</p>')
+    + (r.non_trovati?.length ? `<p class="note">Codici non presenti nel CRM (ignorati): ${r.non_trovati.map(esc).join(', ')}</p>` : '');
+  $('#pub').disabled = !m.length;
+  $('#prev').classList.remove('hide');
+}
+
+async function file(f) {
+  $('#fmsg').className = 'msg'; $('#fmsg').textContent = 'Controllo il file…'; $('#prev').classList.add('hide'); $('#pmsg').textContent = '';
+  try {
+    NOME = f.name; RIGHE = leggi(await f.text());
+    const r = await rpc(false);
+    $('#fmsg').textContent = `${f.name}: ${RIGHE.length} righe lette.`;
+    anteprima(r);
+  } catch (e) { $('#fmsg').className = 'msg ko'; $('#fmsg').textContent = e.message; RIGHE = null; }
+}
+
+async function stato() {
+  const { data: { session } } = await sb.auth.getSession();
+  $('#login').classList.toggle('hide', !!session); $('#app').classList.toggle('hide', !session);
+}
+$('#fl').addEventListener('submit', async e => {
+  e.preventDefault(); $('#lerr').textContent = '';
+  const { error } = await sb.auth.signInWithPassword({ email: $('#em').value.trim(), password: $('#pw').value });
+  if (error) { $('#lerr').textContent = 'Credenziali non valide.'; return; }
+  stato();
+});
+$('#out').addEventListener('click', async () => { await sb.auth.signOut(); stato(); });
+const drop = $('#drop');
+drop.addEventListener('click', () => $('#file').click());
+$('#file').addEventListener('change', e => { if (e.target.files[0]) file(e.target.files[0]); e.target.value = ''; });
+['dragenter', 'dragover'].forEach(t => drop.addEventListener(t, e => { e.preventDefault(); drop.classList.add('over'); }));
+['dragleave', 'drop'].forEach(t => drop.addEventListener(t, e => { e.preventDefault(); drop.classList.remove('over'); }));
+drop.addEventListener('drop', e => { const f = e.dataTransfer.files[0]; if (f) file(f); });
+$('#assenti').addEventListener('change', () => { if (RIGHE) rpc(false).then(anteprima).catch(e => { $('#fmsg').className = 'msg ko'; $('#fmsg').textContent = e.message; }); });
+$('#ann').addEventListener('click', () => { RIGHE = null; $('#prev').classList.add('hide'); $('#fmsg').textContent = ''; });
+$('#pub').addEventListener('click', async () => {
+  const b = $('#pub'); b.disabled = true; $('#pmsg').className = 'msg'; $('#pmsg').textContent = 'Pubblico…';
+  try {
+    const r = await rpc(true);
+    $('#pmsg').className = 'msg ok'; $('#pmsg').textContent = `Fatto: ${r.modifiche.length} referenze aggiornate. Il listino pubblico è già aggiornato.`;
+    RIGHE = null;
+  } catch (e) { $('#pmsg').className = 'msg ko'; $('#pmsg').textContent = e.message; b.disabled = false; }
+});
+sb.auth.onAuthStateChange(() => stato());
+stato();
+})();
+</script>
+</body>
+</html>
