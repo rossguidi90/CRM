@@ -110,6 +110,8 @@ async function boot() {
   renderShell();
   route();
   feedLive();
+  winesLive();
+  versioneLive();
   sb.from('feed').select('id', { count: 'exact', head: true }).gt('created_at', new Date(feedSeen()).toISOString())
     .then(({ count }) => { if (S.view !== 'home' && count) feedBadge(count); }, () => {});
 }
@@ -237,6 +239,7 @@ function route() {
   const [seg, ...rest] = h.split('/');
   const r = ROUTES.find(r => r.seg === seg) || ROUTES[0];
   S.view = seg;
+  S.onWines = null;
   setNav(r.nav || r.seg);
   loading();
   S.anim = true;
@@ -368,6 +371,52 @@ function feedLive() {
     } else feedBadge(feedNuovi + 1);
   }).subscribe();
 }
+/* Catalogo sempre allineato: realtime su vini/movimenti + ricarica al ritorno sulla scheda */
+let winesT;
+const winesRefresh = () => { clearTimeout(winesT); winesT = setTimeout(() => S.onWines && go(S.onWines), 1200); };
+function winesLive() {
+  sb.channel('crm-wines')
+    .on('postgres_changes', { event: '*', schema: CFG.schema, table: 'wines' }, winesRefresh)
+    .on('postgres_changes', { event: 'INSERT', schema: CFG.schema, table: 'stock_movements' }, winesRefresh)
+    .subscribe();
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) winesRefresh(); });
+}
+
+/* Nuova versione pubblicata: confronta ETag/contenuto di index.html e degli script locali */
+async function firmaVersione() {
+  const files = ['index.html', ...[...document.querySelectorAll('script[src]')].map(s => s.getAttribute('src'))
+    .filter(u => !/^(https?:)?\/\//.test(u)).map(u => u.split('?')[0])];
+  const parti = await Promise.all(files.map(async f => {
+    const r = await fetch(f + '?_=' + Date.now(), { cache: 'no-store' });
+    if (!r.ok) throw new Error(f + ' ' + r.status);
+    return f + ':' + (r.headers.get('etag') || r.headers.get('last-modified') || (await r.text()).length);
+  }));
+  return parti.join('|');
+}
+function versioneLive() {
+  let base = null, avvisato = false;
+  const check = async () => {
+    if (avvisato || document.hidden || !navigator.onLine) return;
+    try {
+      const f = await firmaVersione();
+      if (base == null) base = f;
+      else if (f !== base) { avvisato = true; bannerVersione(); }
+    } catch (e) {}
+  };
+  check();
+  setInterval(check, 5 * 60e3);
+  document.addEventListener('visibilitychange', check);
+}
+function bannerVersione() {
+  if (document.getElementById('waVer')) return;
+  document.body.insertAdjacentHTML('beforeend', `<div id="waVer" role="status" style="position:fixed;left:50%;transform:translateX(-50%);
+    bottom:calc(76px + env(safe-area-inset-bottom));z-index:9999;display:flex;gap:12px;align-items:center;max-width:calc(100vw - 32px);
+    padding:10px 10px 10px 16px;border-radius:14px;background:var(--fg);color:var(--bg);box-shadow:0 6px 24px rgba(0,0,0,.25);font-size:14px">
+    <span>È disponibile una nuova versione del CRM</span>
+    <button class="btn sm" id="waVerOk" style="white-space:nowrap">Ricarica</button></div>`);
+  document.getElementById('waVerOk').addEventListener('click', () => location.reload());
+}
+
 const kpi = (l, v, n, tone = '', extra = '') =>
   `<div class="kpi"><span class="l">${esc(l)}</span><span class="v mono">${esc(v)}</span>
    <span class="n" ${tone === 'orange' ? 'style="color:var(--orange)"' : ''}>${esc(n)}</span>${extra}</div>`;
@@ -1067,6 +1116,17 @@ addRoute('catalogo', async () => {
   if (error) throw error;
   const ST = Object.fromEntries((stock || []).map(s => [s.wine_id, s]));
   const f = { q: '', tipo: '', set: 'inventario', zona: '' };
+  const vista = S.view;
+  S.onWines = async () => {
+    if (S.view !== vista || !$('#lista') || document.querySelector('.modal, dialog[open]')) return;
+    const [{ data: nw, error: e1 }, { data: ns }] = await Promise.all([
+      sb.from('wines').select('*').order('produttore').order('nome'), sb.rpc('stock')]);
+    if (e1 || !nw || !wines || S.view !== vista) return;
+    wines.splice(0, wines.length, ...nw);
+    Object.keys(ST).forEach(k => delete ST[k]);
+    (ns || []).forEach(s => { ST[s.wine_id] = s; });
+    disegna();
+  };
 
   const disegna = () => {
     const q = f.q.toLowerCase();
