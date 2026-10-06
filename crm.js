@@ -423,7 +423,12 @@ function bannerVersione() {
     padding:10px 10px 10px 16px;border-radius:14px;background:var(--fg);color:var(--bg);box-shadow:0 6px 24px rgba(0,0,0,.25);font-size:14px">
     <span>È disponibile una nuova versione del CRM</span>
     <button class="btn sm" id="waVerOk" style="white-space:nowrap">Ricarica</button></div>`);
-  document.getElementById('waVerOk').addEventListener('click', () => location.reload());
+  document.getElementById('waVerOk').addEventListener('click', async e => {
+    e.currentTarget.disabled = true;
+    // aggiorna la cache HTTP (Pages tiene index.html fino a 10 min), poi ricarica
+    try { await Promise.all(['./', 'index.html'].map(u => fetch(u, { cache: 'reload' }))); } catch (er) {}
+    location.reload();
+  });
 }
 
 const kpi = (l, v, n, tone = '', extra = '') =>
