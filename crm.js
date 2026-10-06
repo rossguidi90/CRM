@@ -1071,8 +1071,10 @@ const nomeVino = w => `<span class="prod">${esc(w.produttore || '—')}</span>
   <span class="wn">${tipoTag(w)}${esc(w.nome)}${w.annata ? ' <span class="ann">' + esc(w.annata) + '</span>' : ''}</span>
   ${w.vitigni ? `<span class="vit">${esc(w.vitigni)}</span>` : ''}`;
 const bottSvg = t => `<svg viewBox="0 0 24 64" aria-hidden="true"><path fill="${tcol(t)}" opacity=".55" d="M9 2h6v14c0 3 5 6 5 12v32a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V28c0-6 5-9 5-12z"/></svg>`;
-const fotoVino = (w, m) => `<span class="${m === 'big' ? 'fotobig' : 'thumb'}"${w.foto_url && m === 'zoom' ? ` data-zoom="${esc(w.foto_url)}"` : ''}>${w.foto_url
-  ? `<img src="${esc(w.foto_url)}" alt="" loading="lazy" decoding="async" onerror="this.remove()">` : bottSvg(w.tipologia)}</span>`;
+const fotoUrl = w => (w.scheda?.img ? imgListino(w.scheda.img) : w.foto_url) || '';   // come il listino: prima la foto scheda, poi foto_url
+const fotoVino = (w, m) => { const u = fotoUrl(w);
+  return `<span class="${m === 'big' ? 'fotobig' : 'thumb'}"${u && m === 'zoom' ? ` data-zoom="${esc(u)}"` : ''}>${u
+  ? `<img src="${esc(u)}" alt="" loading="lazy" decoding="async" onerror="this.remove()">` : bottSvg(w.tipologia)}</span>`; };
 document.addEventListener('click', e => {
   const t = e.target.closest('[data-zoom]'); if (!t) return;
   e.preventDefault(); e.stopPropagation();
