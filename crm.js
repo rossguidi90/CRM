@@ -405,14 +405,14 @@ async function firmaVersione() {
 function versioneLive() {
   let base = null, avvisato = false;
   const check = async () => {
-    if (avvisato || document.hidden || !navigator.onLine) return;
+    if (avvisato || (base != null && document.hidden) || !navigator.onLine) return;
     try {
       const f = await firmaVersione();
       if (base == null) base = f;
       else if (f !== base) { avvisato = true; bannerVersione(); }
     } catch (e) {}
   };
-  check();
+  check();   // firma di riferimento subito, anche se la scheda è in background
   setInterval(check, 5 * 60e3);
   document.addEventListener('visibilitychange', check);
 }
