@@ -4,7 +4,8 @@ const CRM = (() => {
 'use strict';
 
 const CFG = Object.freeze(Object.assign({
-  schema: 'crm', nome: 'Wine Alchemist', zona: 'Milano', cartone: 6, mappaCentro: [45.4642, 9.19]
+  schema: 'crm', nome: 'Wine Alchemist', zona: 'Milano', cartone: 6, mappaCentro: [45.4642, 9.19],
+  listino: 'https://winealchemist.github.io/listino/'
 }, window.WA_CONFIG || {}));
 
 const CDN_SUPABASE = 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js';
@@ -1173,6 +1174,7 @@ addRoute('catalogo', async () => {
   };
 
   paint(`<div class="bar"><h1>Catalogo</h1><span style="flex:1"></span>
+      ${canScheda() ? `<button class="btn line sm" id="prodBtn">Produttori</button>` : ''}
       ${isAdmin() ? `<button class="btn line sm" id="imp">Importa CSV</button>
         <input type="file" id="file" accept=".csv,text/csv" class="hide">` : ''}</div>
     <div class="search">${svg('cerca', 16)}<label class="sr" for="q">Cerca nel catalogo</label>
@@ -1213,6 +1215,7 @@ addRoute('catalogo', async () => {
     const w = wines.find(x => x.id === b.dataset.w);
     schedaVino(w, ST[w.id], () => { disegna(); });
   });
+  $('#prodBtn')?.addEventListener('click', () => editorProduttori((wines || []).filter(w => w.tipologia !== 'accessorio').map(w => w.produttore)));
   if (isAdmin()) {
     $('#imp').addEventListener('click', () => $('#file').click());
     $('#file').addEventListener('change', e => go(async () => {
@@ -1236,6 +1239,64 @@ addRoute('catalogo', async () => {
   disegna();
 });
 
+/* Schede catalogo (crm.wines.scheda / crm.produttori): immagini relative al listino pubblico */
+const imgListino = u => !u ? '' : /^https?:/.test(u) ? u : CFG.listino + u;
+const canScheda = () => isAdmin() || isViewer();
+const schedaRighe = t => String(t || '').split('\n').map(l => l.trim()).filter(Boolean).map(l => {
+  const i = l.indexOf(':'); return i > 0 ? [l.slice(0, i).trim(), l.slice(i + 1).trim()] : ['', l];
+}).filter(([, v]) => v);
+const schedaHtml = sc => !sc || (!sc.vd && !(sc.s || []).length) ? '' : `<div class="group"><h3>Scheda tecnica</h3><div class="inset">
+  ${sc.vd ? kv('Uve', sc.vd) : ''}${(sc.s || []).map(([k, v]) => kv(k || 'Note', v)).join('')}</div></div>`;
+const schedaForm = sc => `<div class="group"><h3>Scheda catalogo</h3><div class="inset">
+  <div class="row col"><label for="scVd">Uve (testo in listino)</label><input id="scVd" value="${esc(sc?.vd || '')}" placeholder="es. 100% Arneis, vigne di 55 anni"></div>
+  <div class="row col"><label for="scS">Dettagli · una riga per voce, "Voce: testo"</label>
+    <textarea id="scS" rows="6" placeholder="Terreni: marne&#10;Vinificazione: …&#10;Affinamento: …">${esc((sc?.s || []).map(([k, v]) => k ? k + ': ' + v : v).join('\n'))}</textarea></div>
+  <div class="row col"><label for="scImg">Foto bottiglia (percorso nel listino o URL)</label><input id="scImg" value="${esc(sc?.img || '')}" placeholder="b/nomefile.webp"></div>
+  </div><button class="btn line" id="scSv" style="width:100%;margin-top:8px">Salva scheda</button></div>`;
+
+function editorProduttori(nomi) {
+  const m = modal(`<div class="bar"><h2>Produttori</h2><span style="flex:1"></span><button class="btn line sm" data-x>Chiudi</button></div>
+    <div class="search">${svg('cerca', 16)}<label class="sr" for="prq">Cerca produttore</label><input id="prq" type="search" placeholder="Nome produttore"></div>
+    <div class="inset" id="prl" style="margin-top:10px"><div class="empty">Carico…</div></div>`);
+  m.querySelector('[data-x]').addEventListener('click', () => m.remove());
+  go(async () => {
+    const { data, error } = await sb.from('produttori').select('*');
+    if (error) throw error;
+    const P = Object.fromEntries((data || []).map(p => [p.nome, p]));
+    const tutti = [...new Set([...nomi, ...Object.keys(P)])].sort((a, b) => a.localeCompare(b, 'it'));
+    const draw = (q = '') => {
+      $('#prl', m).innerHTML = tutti.filter(n => n.toLowerCase().includes(q.toLowerCase())).map(n => {
+        const p = P[n] || {};
+        return `<button class="row" data-p="${esc(n)}"><span class="av" style="background:${esc(p.colore || 'var(--card2)')}"></span>
+          <span style="flex:1;min-width:0"><span class="ttl">${esc(n)}</span><br><span class="sub">${esc(p.localita || 'Senza scheda')}</span></span>
+          ${p.descrizione ? '' : '<span class="pill">Da completare</span>'}</button>`;
+      }).join('') || '<div class="empty">Nessun produttore.</div>';
+    };
+    draw();
+    $('#prq', m).addEventListener('input', e => draw(e.target.value));
+    $('#prl', m).addEventListener('click', e => {
+      const b = e.target.closest('[data-p]'); if (!b) return;
+      const n = b.dataset.p, p = P[n] || {};
+      const f = modal(`<div class="bar"><h2 style="font-size:19px">${esc(n)}</h2><span style="flex:1"></span><button class="btn line sm" data-x>Chiudi</button></div>
+        ${p.foto ? `<img src="${esc(imgListino(p.foto))}" alt="" style="width:100%;max-height:220px;object-fit:cover;border-radius:12px;margin-bottom:12px">` : ''}
+        <div class="inset">
+          <div class="row col"><label for="pLoc">Località</label><input id="pLoc" value="${esc(p.localita || '')}" placeholder="es. La Morra"></div>
+          <div class="row"><label for="pCol">Colore nel catalogo</label><input id="pCol" type="color" value="${esc(/^#[0-9a-f]{6}$/i.test(p.colore || '') ? p.colore : '#7A1F2B')}"></div>
+          <div class="row col"><label for="pDesc">Descrizione</label><textarea id="pDesc" rows="8">${esc(p.descrizione || '')}</textarea></div>
+          <div class="row col"><label for="pFoto">Foto (percorso nel listino o URL)</label><input id="pFoto" value="${esc(p.foto || '')}" placeholder="p/nomefile.jpg"></div>
+        </div><button class="btn" id="pSv" style="width:100%;margin-top:10px">Salva</button>`);
+      f.querySelector('[data-x]').addEventListener('click', () => f.remove());
+      $('#pSv', f).addEventListener('click', () => go(async () => {
+        const rec = { nome: n, localita: $('#pLoc', f).value.trim() || null, colore: $('#pCol', f).value,
+          descrizione: $('#pDesc', f).value.trim() || null, foto: $('#pFoto', f).value.trim() || null, updated_at: new Date().toISOString() };
+        const { error: e2 } = await sb.from('produttori').upsert(rec, { onConflict: 'nome' });
+        if (e2) throw e2;
+        P[n] = rec; draw($('#prq', m).value); f.remove(); toast('Produttore aggiornato');
+      }));
+    });
+  });
+}
+
 function schedaVino(w, s, done) {
   const admin = isAdmin();
   const m = modal(`<div class="bar"><h2 style="font-size:19px">${esc(w.nome)}</h2><span style="flex:1"></span>
@@ -1256,6 +1317,7 @@ function schedaVino(w, s, done) {
       ${w.gestione_giacenza ? kv('Giacenza', `${s?.giacenza ?? 0} · impegnate ${s?.impegnato ?? 0} · libere ${s?.disponibile ?? 0}`) : ''}
       ${chipsRow('Stili', w.stili)}
     </div>
+    ${canScheda() ? schedaForm(w.scheda) : schedaHtml(w.scheda)}
     ${admin ? `<div class="group"><h3>Impostazioni</h3><div class="inset">
       <div class="row"><label for="inv">In inventario</label>
         <input id="inv" type="checkbox" ${w.in_inventario ? 'checked' : ''}></div>
@@ -1274,6 +1336,17 @@ function schedaVino(w, s, done) {
     </div></div>
     <button class="btn" id="sv" style="width:100%">Salva</button>` : ''}`);
   m.querySelector('[data-x]').addEventListener('click', () => m.remove());
+  if (canScheda()) $('#scSv', m).addEventListener('click', () => go(async () => {
+    const sc = { ...(w.scheda || {}) };
+    const vd = $('#scVd', m).value.trim(), righe = schedaRighe($('#scS', m).value), img = $('#scImg', m).value.trim();
+    vd ? sc.vd = vd : delete sc.vd;
+    righe.length ? sc.s = righe : delete sc.s;
+    img ? sc.img = img : delete sc.img;
+    const scheda = Object.keys(sc).length ? sc : null;
+    const { error } = await sb.from('wines').update({ scheda }).eq('id', w.id);
+    if (error) throw error;
+    w.scheda = scheda; toast('Scheda salvata');
+  }));
   if (!admin) return;
   $('#sv', m).addEventListener('click', () => go(async () => {
     const patch = {
