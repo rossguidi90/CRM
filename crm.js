@@ -47,11 +47,19 @@ const LBL = {
 const lbl = k => LBL[k] || k || '—';
 const isRiba = p => String(p || '').startsWith('riba_');
 const pill = k => `<span class="pill ${esc(k || '')}">${esc(lbl(k))}</span>`;
-const inPromo = w => num(w?.promo_pct) > 0;
+const promoViva = w => !w?.promo_fino || w.promo_fino >= new Date().toISOString().slice(0, 10);
+const promoPct = w => promoViva(w) && num(w?.promo_pct) > 0;
+const promoNM = w => promoViva(w) && num(w?.promo_n) > 0 && num(w?.promo_m) > 0;   // es. 5+1: ogni N pagate, M omaggio
+const inPromo = w => promoPct(w) || promoNM(w);
+const omaggiNM = (w, pagate) => promoNM(w) ? Math.floor(pagate / num(w.promo_n)) * num(w.promo_m) : 0;
 const prezzoBase = w => w.prezzo_listino == null ? null
-  : inPromo(w) ? Math.round(num(w.prezzo_listino) * (100 - num(w.promo_pct))) / 100 : num(w.prezzo_listino);
-const prezzoHtml = w => inPromo(w)
-  ? `<s class="was">${eur(w.prezzo_listino)}</s> <span class="promo">Prezzo promo ${eur(prezzoBase(w))}</span>` : eur(w.prezzo_listino);
+  : promoPct(w) ? Math.round(num(w.prezzo_listino) * (100 - num(w.promo_pct))) / 100 : num(w.prezzo_listino);
+const promoFino = w => w.promo_fino ? ` fino al ${dmy(w.promo_fino)}` : '';
+const prezzoHtml = w => promoPct(w)
+  ? `<s class="was">${eur(w.prezzo_listino)}</s> <span class="promo">Prezzo promo ${eur(prezzoBase(w))}</span>`
+  : promoNM(w) ? `${eur(w.prezzo_listino)} <span class="promo">Promo ${num(w.promo_n)}+${num(w.promo_m)}${promoFino(w)}</span>` : eur(w.prezzo_listino);
+const timbriVino = w => [...(w.timbri || []).map(t => t === 'nuovo' ? '<span class="stamp new">Nuovo ingresso</span>' : '<span class="stamp arr">In riassortimento</span>'),
+  w.condizioni ? `<span class="sub" style="display:block;color:var(--gold)">${esc(w.condizioni)}</span>` : ''].join('');
 const tipoDoc = o => o?.tipo === 'prenotazione' ? 'Prenotazione' : o?.tipo === 'campionatura' ? 'Campionatura' : 'Ordine';
 const ICON = {
   home: 'M3 11l9-7 9 7v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z',
@@ -104,6 +112,7 @@ async function boot() {
   if (error) return err(error);
   if (!data) return renderLogin('Utente senza profilo agente. Contatta l\'amministratore.');
   if (!data.attivo) return renderLogin('Profilo non ancora attivato dall\'amministratore.');
+  if (data.ruolo === 'editor') { location.replace(CFG.listino + 'backoffice.html'); return; }
   S.me = data;
   const { data: ags } = await sb.from('agents').select('id, nome, colore, ruolo, attivo, provvigioni, dettaglio_visibile_a');
   S.agents = Object.fromEntries((ags || []).map(a => [a.id, a]));
@@ -1150,6 +1159,7 @@ addRoute('catalogo', async () => {
     const list = ordinaCat((wines || []).filter(w => {
       if (f.tipo && w.tipologia !== f.tipo) return false;
       if (!inZona(w, f.zona)) return false;
+      if (f.set !== 'tutte' && w.archiviato) return false;
       if (f.set === 'inventario' && !w.in_inventario) return false;
       if (f.set === 'fuori' && w.in_inventario) return false;
       if (f.set === 'giacenza' && !w.gestione_giacenza) return false;
@@ -1161,7 +1171,7 @@ addRoute('catalogo', async () => {
       const s = ST[w.id] || {};
       return `<button class="row tp" data-w="${w.id}" style="--tp:${tcol(w.tipologia)}">
         ${fotoVino(w)}<span style="flex:1;min-width:0">
-          ${nomeVino(w)}
+          ${nomeVino(w)}${timbriVino(w)}${w.archiviato ? '<span class="stamp">Archiviato</span>' : ''}
           <span class="sub">${esc([w.formato_cl ? w.formato_cl + ' cl' : null, w.zona_produzione].filter(Boolean).join(' · '))}</span>
           ${w.no_sconto || !w.vendibile_milano || w.gestione_giacenza ? `<span class="tags" style="margin-top:4px">
             ${w.no_sconto ? '<span class="pill">No sconto</span>' : ''}
@@ -1176,6 +1186,7 @@ addRoute('catalogo', async () => {
   };
 
   paint(`<div class="bar"><h1>Catalogo</h1><span style="flex:1"></span>
+      ${isAdmin() ? `<a class="btn line sm" href="${esc(CFG.listino)}backoffice.html" target="_blank" rel="noopener">Backoffice listino</a>` : ''}
       ${canScheda() ? `<button class="btn line sm" id="prodBtn">Produttori</button>` : ''}
       ${isAdmin() ? `<button class="btn line sm" id="imp">Importa CSV</button>
         <input type="file" id="file" accept=".csv,text/csv" class="hide">` : ''}</div>
@@ -1309,7 +1320,9 @@ function schedaVino(w, s, done) {
     <div class="inset">
       ${kv('Vitigni', w.vitigni || '—')}
       ${kv('Prezzo di listino', eur(w.prezzo_listino))}
-      ${inPromo(w) ? kv('Prezzo promo', `${eur(prezzoBase(w))} (−${num(w.promo_pct)}%)`) : ''}
+      ${promoPct(w) ? kv('Prezzo promo', `${eur(prezzoBase(w))} (−${num(w.promo_pct)}%)${promoFino(w)}`) : ''}
+      ${promoNM(w) ? kv('Promo', `${num(w.promo_n)}+${num(w.promo_m)}: ogni ${num(w.promo_n)} bt pagate, ${num(w.promo_m)} in omaggio (automatico)${promoFino(w)}`) : ''}
+      ${kv('Condizioni', w.condizioni)}
       ${kv('Disponibilità', lbl(w.disponibilita))}
       ${kv('Esclusiva', w.esclusiva)}
       ${kv('Vendibile su ' + CFG.zona, w.vendibile_milano ? 'Sì' : 'No')}
@@ -1332,7 +1345,7 @@ function schedaVino(w, s, done) {
       <div class="row"><label for="pm">Prezzo minimo</label>
         <input id="pm" type="number" step="0.01" min="0" value="${w.prezzo_min ?? ''}"></div>
       <div class="row"><label for="pp">Sconto promo %</label>
-        <input id="pp" type="number" step="1" min="0" max="90" placeholder="nessuna" value="${w.promo_pct ?? ''}"></div>
+        <input id="pp" type="number" step="1" min="0" max="90" placeholder="nessuna" value="${w.promo_pct ?? ''}" ${w.promo_n ? 'disabled title="Promo N+M attiva: si gestisce dal backoffice"' : ''}></div>
       <div class="row"><label for="ca">Carico bottiglie</label>
         <input id="ca" type="number" step="1" placeholder="0"></div>
     </div></div>
@@ -1355,7 +1368,7 @@ function schedaVino(w, s, done) {
       in_inventario: $('#inv', m).checked, gestione_giacenza: $('#gg', m).checked,
       scorta_min: +$('#sm', m).value || 0, lead_time_gg: +$('#lt', m).value || 14,
       prezzo_min: $('#pm', m).value === '' ? null : +$('#pm', m).value,
-      promo_pct: +$('#pp', m).value > 0 ? +$('#pp', m).value : null
+      ...(w.promo_n ? {} : { promo_pct: +$('#pp', m).value > 0 ? +$('#pp', m).value : null })
     };
     const { error } = await sb.from('wines').update(patch).eq('id', w.id);
     if (error) throw error;
@@ -1465,7 +1478,7 @@ addRoute('ordine', async (id, extra) => {
   const ST = Object.fromEntries((stock || []).map(s => [s.wine_id, s]));
   const fz = w => !w.vendibile_milano;
   const catalogo = ordinaCat((ws || []).filter(w => ST[w.id]?.vendibile ||
-    (fz(w) && w.prezzo_listino != null && w.disponibilita !== 'esaurito')));
+    (fz(w) && !w.archiviato && w.prezzo_listino != null && w.disponibilita !== 'esaurito')));
   const arrivo = w => items.get(w.id)?.in_arrivo ?? w.disponibilita === 'in_arrivo';
   const items = new Map((rows || []).map(i => [i.wine_id, i]));
   let editabile = o.stato === 'bozza' && (isAdmin() || o.agent_id === S.me.id);
@@ -1483,6 +1496,9 @@ addRoute('ordine', async (id, extra) => {
     const it = items.get(w.id);
     if (!it && q > 0 && fz(w)) toast(`⚠︎ Fuori zona: ${w.esclusiva || 'non vendibile su ' + CFG.zona}. Verifica prima di inviare.`, 5000);
     if (q <= 0) items.delete(w.id);
+    else if (promoNM(w)) { const om = omaggiNM(w, q);
+      if (it) { it.qty = q + om; it.qty_omaggio = om; it.sconto_pct = 0; }
+      else items.set(w.id, { wine_id: w.id, qty: q + om, sconto_pct: 0, qty_omaggio: om, prezzo_unitario: prezzoBase(w) }); }
     else if (it) { it.qty = q; if ((it.qty_omaggio || 0) > q) it.qty_omaggio = q; }
     else items.set(w.id, { wine_id: w.id, qty: q, sconto_pct: f.sconto || 0, qty_omaggio: 0, prezzo_unitario: prezzoBase(w) });
     pend.add(w.id); f.dirty = true;
@@ -1503,7 +1519,7 @@ addRoute('ordine', async (id, extra) => {
             const r = await sb.from('order_items').update({ qty: q, qty_omaggio: Math.min(loc.qty_omaggio || 0, q) }).eq('id', row.id).select().single();
             if (r.error) throw r.error; srv.set(wid, r.data);
           } else if (q) {
-            const r = await sb.from('order_items').insert({ order_id: o.id, wine_id: wid, qty: q, sconto_pct: loc.sconto_pct || 0 }).select().single();
+            const r = await sb.from('order_items').insert({ order_id: o.id, wine_id: wid, qty: q, sconto_pct: loc.sconto_pct || 0, qty_omaggio: loc.qty_omaggio || 0 }).select().single();
             if (r.error) throw r.error; srv.set(wid, r.data);
           }
           if (!pend.has(wid) && srv.has(wid) && items.has(wid)) items.set(wid, { ...srv.get(wid) });
@@ -1602,15 +1618,16 @@ addRoute('ordine', async (id, extra) => {
     });
   }
 
+  const qIn = (w, it) => !it ? 0 : promoNM(w) ? it.qty - (it.qty_omaggio || 0) : it.qty;
   const rigaVino = w => {
-    const it = items.get(w.id), q = it ? it.qty : 0, s = ST[w.id] || {};
+    const it = items.get(w.id), q = qIn(w, it), s = ST[w.id] || {};
     const disp = w.gestione_giacenza ? `Libere ${s.disponibile ?? 0}` : lbl(w.disponibilita);
     const tono = w.gestione_giacenza && s.disponibile <= 12 ? 'var(--orange)' : 'var(--fg2)';
     return `<div class="row tp${fz(w) ? ' fz' : ''}" style="--tp:${tcol(w.tipologia)};${q ? 'background:var(--accent-tint)' : ''}">
       ${fotoVino(w, 'zoom')}<span style="flex:1;min-width:0">
         ${fz(w) ? `<span class="stamp" title="${esc(w.esclusiva || '')}">Fuori zona</span>` : ''}
         ${w.disponibilita === 'in_arrivo' ? '<span class="stamp arr" title="Spedita separatamente all\'arrivo">In arrivo</span>' : ''}
-        ${nomeVino(w)}
+        ${nomeVino(w)}${timbriVino(w)}
         ${fz(w) && w.esclusiva ? `<span class="sub" style="display:block;color:var(--red)">${esc(w.esclusiva)}</span>` : ''}
         ${ultimo[w.id] ? (() => { const u = ultimo[w.id], net = num(u.prezzo_unitario) * (1 - num(u.sconto_pct) / 100),
             d = num(prezzoBase(w)) - num(u.prezzo_unitario);
@@ -1626,10 +1643,10 @@ addRoute('ordine', async (id, extra) => {
   };
 
   const rigaCarrello = w => {
-    const it = items.get(w.id), q = it ? it.qty : 0, om = it?.qty_omaggio || 0, sc = num(it?.sconto_pct);
-    const lordo = num(it?.prezzo_unitario ?? prezzoBase(w)) * q, net = it ? netto(w, it) : 0;
+    const it = items.get(w.id), q = qIn(w, it), om = it?.qty_omaggio || 0, sc = num(it?.sconto_pct);
+    const lordo = num(it?.prezzo_unitario ?? prezzoBase(w)) * (it ? it.qty : 0), net = it ? netto(w, it) : 0;
     const bloccato = inPromo(w) || (noSc(w) && !boss);
-    const info = [sc ? `−${sc}%` : '', om ? `${om} omaggio` : ''].filter(Boolean).join(' · ');
+    const info = [sc ? `−${sc}%` : '', om ? `${om} omaggio${promoNM(w) ? ` (promo ${num(w.promo_n)}+${num(w.promo_m)})` : ''}` : ''].filter(Boolean).join(' · ');
     return `<div class="cart-item tp${fz(w) ? ' fz' : ''}" style="--tp:${tcol(w.tipologia)}">
       <div class="cart-row">
         <span style="flex:1;min-width:0">
@@ -1806,7 +1823,7 @@ addRoute('ordine', async (id, extra) => {
       if (t.dataset.qty) {
         const w = catalogo.find(x => x.id === t.dataset.qty); if (!w) return;
         const n = Math.max(0, Math.round(Number(t.value) || 0));
-        if (n !== (items.get(w.id)?.qty || 0)) go(() => setQty(w, n));
+        if (n !== qIn(w, items.get(w.id))) go(() => setQty(w, n));
         return;
       }
       const id = t.dataset.rsc || t.dataset.rom; if (!id) return;
