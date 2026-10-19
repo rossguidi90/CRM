@@ -58,7 +58,10 @@ const promoFino = w => w.promo_fino ? ` fino al ${dmy(w.promo_fino)}` : '';
 const prezzoHtml = w => promoPct(w)
   ? `<s class="was">${eur(w.prezzo_listino)}</s> <span class="promo">Prezzo promo ${eur(prezzoBase(w))}</span>`
   : promoNM(w) ? `${eur(w.prezzo_listino)} <span class="promo">Promo ${num(w.promo_n)}+${num(w.promo_m)}${promoFino(w)}</span>` : eur(w.prezzo_listino);
-const timbriVino = w => [...(w.timbri || []).map(t => t === 'nuovo' ? '<span class="stamp new">Nuovo ingresso</span>' : '<span class="stamp arr">In riassortimento</span>'),
+/* etichette timbri: default + personalizzati dal backoffice (crm.listino_config.timbri) */
+const TLBL = { nuovo: 'Nuovo ingresso', riassortimento: 'In riassortimento' };
+const tLbl = t => TLBL[t] || String(t).replace(/_/g, ' ').replace(/^./, c => c.toUpperCase());
+const timbriVino = w => [...(w.timbri || []).map(t => `<span class="stamp ${t === 'nuovo' ? 'new' : 'arr'}">${esc(tLbl(t))}</span>`),
   w.condizioni ? `<span class="sub" style="display:block;color:var(--gold)">${esc(w.condizioni)}</span>` : ''].join('');
 const tipoDoc = o => o?.tipo === 'prenotazione' ? 'Prenotazione' : o?.tipo === 'campionatura' ? 'Campionatura' : 'Ordine';
 const ICON = {
@@ -114,6 +117,8 @@ async function boot() {
   if (!data.attivo) return renderLogin('Profilo non ancora attivato dall\'amministratore.');
   if (data.ruolo === 'editor') { location.replace(CFG.listino + 'backoffice.html'); return; }
   S.me = data;
+  sb.from('listino_config').select('timbri').eq('id', 1).maybeSingle()
+    .then(({ data: lc }) => (lc?.timbri || []).forEach(t => { if (t?.k) TLBL[t.k] = t.l; }), () => {});
   const { data: ags } = await sb.from('agents').select('id, nome, colore, ruolo, attivo, provvigioni, dettaglio_visibile_a');
   S.agents = Object.fromEntries((ags || []).map(a => [a.id, a]));
   window.addEventListener('hashchange', route);
@@ -1332,7 +1337,8 @@ function schedaVino(w, s, done) {
       ${w.gestione_giacenza ? kv('Giacenza', `${s?.giacenza ?? 0} · impegnate ${s?.impegnato ?? 0} · libere ${s?.disponibile ?? 0}`) : ''}
       ${chipsRow('Stili', w.stili)}
     </div>
-    ${canScheda() ? schedaForm(w.scheda) : schedaHtml(w.scheda)}
+    ${admin ? `${schedaHtml(w.scheda)}<a class="btn" style="width:100%;margin:4px 0 12px" href="${esc(CFG.listino)}backoffice.html#vino=${encodeURIComponent(w.id)}" target="wa_backoffice" rel="noopener">Modifica scheda, foto e listino nel backoffice ↗</a>`
+      : canScheda() ? schedaForm(w.scheda) : schedaHtml(w.scheda)}
     ${admin ? `<div class="group"><h3>Impostazioni</h3><div class="inset">
       <div class="row"><label for="inv">In inventario</label>
         <input id="inv" type="checkbox" ${w.in_inventario ? 'checked' : ''}></div>
@@ -1351,7 +1357,7 @@ function schedaVino(w, s, done) {
     </div></div>
     <button class="btn" id="sv" style="width:100%">Salva</button>` : ''}`);
   m.querySelector('[data-x]').addEventListener('click', () => m.remove());
-  if (canScheda()) $('#scSv', m).addEventListener('click', () => go(async () => {
+  if (canScheda() && !admin) $('#scSv', m).addEventListener('click', () => go(async () => {
     const sc = { ...(w.scheda || {}) };
     const vd = $('#scVd', m).value.trim(), righe = schedaRighe($('#scS', m).value), img = $('#scImg', m).value.trim();
     vd ? sc.vd = vd : delete sc.vd;
