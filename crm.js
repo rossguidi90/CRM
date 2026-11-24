@@ -1681,7 +1681,8 @@ addRoute('ordine', async (id, extra) => {
     const scontiTot = lordoTot - num(o.imponibile);
     const impLoc = scelti.reduce((a, w) => a + netto(w, items.get(w.id)), 0);
     const arrLoc = scelti.filter(arrivo).reduce((a, w) => a + netto(w, items.get(w.id)), 0);
-    const kvArr = arrLoc > 0 ? kv('Seconda spedizione (in arrivo)', `${eur(arrLoc)}${arrLoc < 400 ? ` · <b style="color:var(--red)">sotto i ${eur(400)}: trasporto a carico del cliente</b>` : ''}`) : '';
+    // kv() escapa il valore: qui serve markup (avviso in rosso), quindi la riga è costruita a mano con i soli valori escapati.
+    const kvArr = arrLoc > 0 ? `<div class="row"><label>Seconda spedizione (in arrivo)</label><span class="v">${esc(eur(arrLoc))}${arrLoc < 400 ? ` · <b style="color:var(--red)">sotto i ${esc(eur(400))}: trasporto a carico del cliente</b>` : ''}</span></div>` : '';
     const riep = f.dirty ? `${kv('Imponibile (provvisorio)', eur(impLoc))}${kvArr}
           <div class="row"><label>Totale</label><span class="v sub">aggiornamento…</span></div>` : `          ${scontiTot > 0.004 ? kv('Totale listino', eur(lordoTot)) + kv('Sconti e omaggi', '− ' + eur(scontiTot)) : ''}
           ${kv('Imponibile', eur(o.imponibile))}${kvArr}
