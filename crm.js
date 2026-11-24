@@ -1687,10 +1687,10 @@ addRoute('ordine', async (id, extra) => {
       || (isViewer() && ['inviato', 'confermato'].includes(o.stato)));
     const franco = !!o.franco_arrivo_concesso;
     // kv() escapa il valore: qui serve markup (avviso / interruttore), quindi la riga è costruita a mano con i soli valori escapati.
-    const kvArr = arrLoc > 0 ? `<div class="row"><label for="oFrancoArr">Seconda spedizione (in arrivo)${arrLoc < 400 || franco ? `<br><span class="sub">${franco
+    const kvArr = arrLoc > 0 ? `<div class="row"><label for="oFrancoArr" style="flex-shrink:1;min-width:0">Seconda spedizione (in arrivo)${arrLoc < 400 || franco ? `<br><span class="sub">${franco
         ? '<span style="color:var(--green)">Porto franco concesso</span>'
         : `<span style="color:var(--red)">sotto i ${esc(eur(400))}: trasporto a carico del cliente</span>`}</span>` : ''}</label>
-      <span style="margin-left:auto;display:flex;align-items:center;gap:8px"><span class="v mono">${esc(eur(arrLoc))}</span>
+      <span style="margin-left:auto;display:flex;align-items:center;gap:8px;flex-shrink:0"><span class="v mono">${esc(eur(arrLoc))}</span>
       ${(arrLoc < 400 || franco) && puoFranco ? `<input id="oFrancoArr" type="checkbox" class="sw" title="Porto franco concesso sulla seconda spedizione" ${franco ? 'checked' : ''}>` : ''}</span></div>` : '';
     const riep = f.dirty ? `${kv('Imponibile (provvisorio)', eur(impLoc))}${kvArr}
           <div class="row"><label>Totale</label><span class="v sub">aggiornamento…</span></div>` : `          ${scontiTot > 0.004 ? kv('Totale listino', eur(lordoTot)) + kv('Sconti e omaggi', '− ' + eur(scontiTot)) : ''}
