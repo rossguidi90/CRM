@@ -1681,8 +1681,17 @@ addRoute('ordine', async (id, extra) => {
     const scontiTot = lordoTot - num(o.imponibile);
     const impLoc = scelti.reduce((a, w) => a + netto(w, items.get(w.id)), 0);
     const arrLoc = scelti.filter(arrivo).reduce((a, w) => a + netto(w, items.get(w.id)), 0);
-    // kv() escapa il valore: qui serve markup (avviso in rosso), quindi la riga è costruita a mano con i soli valori escapati.
-    const kvArr = arrLoc > 0 ? `<div class="row"><label>Seconda spedizione (in arrivo)</label><span class="v">${esc(eur(arrLoc))}${arrLoc < 400 ? ` · <b style="color:var(--red)">sotto i ${esc(eur(400))}: trasporto a carico del cliente</b>` : ''}</span></div>` : '';
+    // Porto franco sulla seconda spedizione concesso a discrezione: stessi permessi della policy ord_upd sul DB.
+    const puoFranco = o.tipo !== 'campionatura' && (isAdmin()
+      || (o.agent_id === S.me.id && ['bozza', 'inviato'].includes(o.stato))
+      || (isViewer() && ['inviato', 'confermato'].includes(o.stato)));
+    const franco = !!o.franco_arrivo_concesso;
+    // kv() escapa il valore: qui serve markup (avviso / interruttore), quindi la riga è costruita a mano con i soli valori escapati.
+    const kvArr = arrLoc > 0 ? `<div class="row"><label for="oFrancoArr">Seconda spedizione (in arrivo)${arrLoc < 400 || franco ? `<br><span class="sub">${franco
+        ? '<span style="color:var(--green)">Porto franco concesso</span>'
+        : `<span style="color:var(--red)">sotto i ${esc(eur(400))}: trasporto a carico del cliente</span>`}</span>` : ''}</label>
+      <span style="margin-left:auto;display:flex;align-items:center;gap:8px"><span class="v mono">${esc(eur(arrLoc))}</span>
+      ${(arrLoc < 400 || franco) && puoFranco ? `<input id="oFrancoArr" type="checkbox" class="sw" title="Porto franco concesso sulla seconda spedizione" ${franco ? 'checked' : ''}>` : ''}</span></div>` : '';
     const riep = f.dirty ? `${kv('Imponibile (provvisorio)', eur(impLoc))}${kvArr}
           <div class="row"><label>Totale</label><span class="v sub">aggiornamento…</span></div>` : `          ${scontiTot > 0.004 ? kv('Totale listino', eur(lordoTot)) + kv('Sconti e omaggi', '− ' + eur(scontiTot)) : ''}
           ${kv('Imponibile', eur(o.imponibile))}${kvArr}
@@ -1874,6 +1883,13 @@ addRoute('ordine', async (id, extra) => {
       else go(async () => { await togliPromo(); render(); });
     });
     $('#oPromCambia')?.addEventListener('click', () => scegliOmaggio());
+    $('#oFrancoArr')?.addEventListener('change', e => go(async () => {
+      const v = e.target.checked;
+      const r = await sb.from('orders').update({ franco_arrivo_concesso: v }).eq('id', o.id).select().single();
+      if (r.error) { e.target.checked = !v; throw r.error; }
+      Object.assign(o, r.data); render();
+      toast(v ? 'Porto franco concesso sulla seconda spedizione' : 'Trasporto seconda spedizione a carico del cliente');
+    }));
     $('#oTipo')?.addEventListener('click', e => {
       const b = e.target.closest('[data-tipo-doc]'); if (!b || b.dataset.tipoDoc === o.tipo) return;
       go(async () => {
